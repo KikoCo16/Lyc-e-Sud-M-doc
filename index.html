@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lycée Sud Médoc</title>
+    <script src="https://meet.jit.si/external_api.js"></script>
+    <style>
+        :root { --blue: #0084ff; --bg: #ffffff; --gray: #f0f2f5; --text: #050505; --red: #fa3c4c; --green: #31a24c; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background: var(--bg); height: 100vh; overflow: hidden; color: var(--text); }
+        
+        .hidden { display: none !important; }
+        button { cursor: pointer; border: none; outline: none; transition: 0.2s; }
+        
+        /* --- CONNEXION --- */
+        #view-login { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 3000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; }
+        .login-logo { width: 80px; margin-bottom: 20px; }
+        .login-title { font-size: 24px; font-weight: 700; margin-bottom: 30px; background: linear-gradient(45deg, #0099ff, #a033ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .login-input { width: 100%; max-width: 300px; padding: 15px; border: 1px solid #ddd; border-radius: 12px; background: #f0f2f5; font-size: 16px; margin-bottom: 12px; text-align: center; }
+        .btn-primary { width: 100%; max-width: 300px; padding: 14px; background: var(--blue); color: white; border-radius: 30px; font-weight: bold; font-size: 16px; }
+
+        /* --- HEADER & LISTE --- */
+        .header { background: white; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; height: 65px; border-bottom: 1px solid #eee; position: sticky; top: 0; }
+        .header-title { font-weight: 800; font-size: 26px; }
+        .avatar { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: #eee; flex-shrink: 0; border: 1px solid #eee; }
+        
+        #view-list { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+        .search-bar { padding: 10px 15px; }
+        .search-input { width: 100%; background: var(--gray); border: none; padding: 12px 18px; border-radius: 25px; font-size: 15px; }
+        
+        #contact-list { flex: 1; overflow-y: auto; padding-bottom: 80px; }
+        .contact-item { padding: 12px 15px; display: flex; align-items: center; gap: 12px; position: relative; }
+        .contact-item:active { background: #f2f2f2; }
+        .contact-info { flex: 1; min-width: 0; }
+        .name { font-weight: 600; font-size: 16px; margin-bottom: 2px; }
+        .last-msg { font-size: 14px; color: #65676b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .last-msg.unread { font-weight: 700; color: var(--text); }
+        .badge-count { background: var(--red); color: white; min-width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; padding: 0 4px; }
+
+        /* --- CHAT VIEW --- */
+        #view-chat { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 2000; display: flex; flex-direction: column; transform: translateX(100%); transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #view-chat.active { transform: translateX(0); }
+        #messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+        
+        .msg-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 2px; }
+        .msg-bubble { padding: 8px 14px; border-radius: 20px; font-size: 15px; max-width: 75vw; position: relative; line-height: 1.4; word-wrap: break-word; }
+        .msg-row.sent { justify-content: flex-end; }
+        .msg-row.sent .msg-bubble { background: var(--blue); color: white; border-bottom-right-radius: 4px; }
+        .msg-row.received .msg-bubble { background: var(--gray); color: black; border-bottom-left-radius: 4px; }
+        .msg-bubble img, .msg-bubble video { max-width: 100%; border-radius: 12px; margin-top: 5px; display: block; }
+        .sender-name { font-size: 11px; color: #888; margin-left: 10px; margin-bottom: 2px; }
+
+        .input-area { border-top: 1px solid #eee; padding: 10px; display: flex; align-items: center; gap: 12px; background: white; }
+        .input-text { flex: 1; background: var(--gray); border: none; padding: 12px 18px; border-radius: 25px; font-size: 16px; outline: none; }
+
+        /* --- MODALES & MENUS --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 4000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .modal-box { background: white; width: 85%; max-width: 350px; border-radius: 20px; padding: 25px; animation: pop 0.2s; }
+        .modal-title { font-size: 19px; font-weight: 700; text-align: center; margin-bottom: 20px; }
+        .modal-input { width: 100%; padding: 14px; background: #f0f2f5; border: 1px solid #ddd; border-radius: 10px; margin-bottom: 15px; font-size: 16px; }
+        .modal-btns { display: flex; gap: 10px; }
+        .btn-modal { flex: 1; padding: 12px; border-radius: 10px; font-weight: bold; }
+        
+        /* Empêcher la sélection de texte sur les icônes d'action */
+        .header span[onclick] {
+            user-select: none;
+            -webkit-user-select: none;
+            padding: 5px; /* Agrandit la zone de clic sans changer le visuel */
+            display: inline-block;
+            touch-action: manipulation;
+        }
+
+        .chat-menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 5000; display: flex; align-items: flex-end; }
+        .chat-menu-box { width: 100%; background: white; border-radius: 25px 25px 0 0; padding: 20px; transform: translateY(0); animation: slideUp 0.3s; }
+        .chat-menu-item { padding: 16px; font-size: 17px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+        .chat-menu-item.danger { color: var(--red); }
+
+        /* FAB */
+        .fab { position: fixed; bottom: 25px; right: 25px; width: 56px; height: 56px; background: var(--blue); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 30px; box-shadow: 0 5px 15px rgba(0,132,255,0.4); z-index: 100; }
+        .fab-menu { position: fixed; bottom: 95px; right: 25px; display: flex; flex-direction: column; gap: 12px; z-index: 99; transition: 0.3s; pointer-events: none; opacity: 0; transform: translateY(20px); }
+        .fab-menu.show { opacity: 1; transform: translateY(0); pointer-events: all; }
+        .fab-item { background: white; padding: 10px 20px; border-radius: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-weight: 600; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+
+        @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div id="view-login">
+        <img src="https://cdn-icons-png.flaticon.com/512/8093/8093162.png" class="login-logo">
+        <div class="login-title">Lycée Sud Médoc</div>
+        <input type="text" id="login-username" class="login-input" placeholder="Pseudo" autocomplete="off">
+        <input type="number" id="login-id" class="login-input" placeholder="ID (3 à 5 chiffres)" autocomplete="off">
+        <input type="password" id="login-pw" class="login-input" placeholder="Mot de passe">
+        <button class="btn-primary" onclick="doLogin()">CONNEXION</button>
+        <div id="login-error" style="color:red; font-size:13px; margin-top:10px; max-width: 250px; text-align: center;"></div>
+    </div>
+
+    <div id="view-list" class="hidden">
+        <div class="header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <label for="profile-upload">
+                    <img id="my-avatar" class="avatar" src="https://cdn-icons-png.flaticon.com/512/149/149071.png">
+                </label>
+                <input type="file" id="profile-upload" class="hidden" accept="image/*">
+                <div>
+                    <div class="header-title" id="header-user-name">Discussions</div>
+                    <div id="display-my-id" style="font-size: 12px; color: #888; font-weight: 500;">ID: ----</div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button onclick="hardReset()" style="color:#aaa; background:none; font-size:11px; font-weight:bold;">DÉCONNEXION</button>
+            </div>
+        </div>
+
+        <div class="search-bar">
+            <input type="text" class="search-input" placeholder="Rechercher..." onkeyup="filterContacts(this.value)">
+        </div>
+        <div id="contact-list"></div>
+        <div class="fab-menu" id="fab-menu">
+            <div class="fab-item" onclick="openModal('group')">Nouveau Groupe 👥</div>
+            <div class="fab-item" onclick="openModal('contact')">Ajouter un ID 👤</div>
+        </div>
+        <div class="fab" onclick="toggleFab()">+</div>
+    </div>
+
+    <div id="view-chat">
+        <div class="header">
+    <button onclick="closeChat()" style="color:var(--blue); background:none; font-size:28px;">←</button>
+    <div style="display:flex; align-items:center; gap:12px; flex: 1; overflow: hidden;">
+        <img id="chat-avatar" class="avatar" style="width:38px; height:38px;">
+        <div style="display:flex; flex-direction:column; overflow: hidden;">
+            <span id="chat-title" style="font-weight: 700; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+            <span id="chat-id-subtitle" style="font-size: 11px; color: #888;"></span>
+        </div>
+    </div>
+    <div style="display:flex; gap:15px; align-items:center; margin-right:5px;">
+    <button onclick="sendCallLink('audio')" style="background:none; font-size:20px; padding:5px;">📞</button>
+    <button onclick="sendCallLink('video')" style="background:none; font-size:20px; padding:5px;">🎥</button>
+    <button onclick="openChatMenu()" style="background:none; font-size:24px; color:var(--blue); padding:5px;">⋮</button>
+</div>
+
+</div>
+
+        <div id="messages"></div>
+        <div id="blocked-banner" class="hidden" style="padding:15px; text-align:center; background:#ffebee; color:var(--red); font-weight:bold;">Conversation Bloquée</div>
+        <div class="input-area" id="input-controls">
+            <label for="media-upload" style="font-size:26px; cursor:pointer;">🖼️</label>
+            <input type="file" id="media-upload" class="hidden" accept="image/*,video/*">
+            <input type="text" id="msgInput" class="input-text" placeholder="Aa" onkeypress="if(event.key==='Enter') sendMessage()">
+            <span style="font-size:26px; color:var(--blue); cursor:pointer;" onclick="sendMessage()">➤</span>
+        </div>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div id="modal-title" class="modal-title"></div>
+            <input type="text" id="modal-input" class="modal-input" autocomplete="off">
+            <input type="text" id="modal-input-2" class="modal-input hidden" placeholder="ID des membres (ex: 123, 456)" autocomplete="off">
+            <div id="modal-error" style="color:red; font-size:12px; text-align:center; margin-bottom:10px;"></div>
+            <div class="modal-btns">
+                <button class="btn-modal" onclick="closeModal()" style="background:#eee;">Annuler</button>
+                <button id="modal-confirm-btn" class="btn-modal" style="background:var(--blue); color:white;">Valider</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-menu-overlay" class="chat-menu-overlay hidden" onclick="closeChatMenu()">
+        <div class="chat-menu-box" onclick="event.stopPropagation()">
+    <div class="chat-menu-item" onclick="openModal('renameLocal')">✏️ Renommer localement</div>
+    <div id="block-menu-btn" class="chat-menu-item" onclick="handleBlockToggle()">🚫 Bloquer l'utilisateur</div>
+    
+    <div id="admin-add-member" class="chat-menu-item hidden" onclick="openModal('addMember')">👤 Ajouter des membres</div>
+    <div id="admin-rename-group" class="chat-menu-item hidden" onclick="openModal('renameGroup')">✏️ Renommer le groupe</div>
+    <label id="admin-change-pp" for="group-pp-upload" class="chat-menu-item hidden" style="margin:0; width:100%;">🖼️ Changer la photo</label>
+    <input type="file" id="group-pp-upload" class="hidden" accept="image/*">
+    
+    <div class="chat-menu-item danger" onclick="confirmDeleteChat()">🗑️ Supprimer la discussion</div>
+    <div class="chat-menu-item" onclick="closeChatMenu()" style="justify-content:center; color:#888; border:none; margin-top:10px;">Fermer</div>
+</div>
+
+    </div>
+
+<script type="module">
+    const manifest = {
+        "name": "Lycée Sud Médoc", "short_name": "Lycee Sud Médoc", "start_url": window.location.href,
+        "display": "standalone", "background_color": "#e7ebf0", "theme_color": "#0088cc",
+        "icons": [{"src": "https://cdn-icons-png.flaticon.com/512/8093/8093162.png", "sizes": "192x192", "type": "image/png"}]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+    const link = document.createElement('link'); link.rel = 'manifest'; link.href = URL.createObjectURL(blob);
+    document.head.appendChild(link);
+
+    // Les imports doivent TOUJOURS être regroupés au début du module.
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+    getFirestore, collection, addDoc, query, orderBy, onSnapshot, 
+    doc, setDoc, getDoc, updateDoc, where, deleteDoc, 
+    getDocs, writeBatch, limit // <-- On ajoute ces trois-là
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAHZTBnuW-2RStrryJVqxWJ1tpD4LLaeq8",
+        authDomain: "messenger-ed88b.firebaseapp.com",
+        projectId: "messenger-ed88b",
+        storageBucket: "messenger-ed88b.firebasestorage.app",
+        messagingSenderId: "625422257839",
+        appId: "1:625422257839:web:a85ce9402d2ae58cc9ce5a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    
+    // Protection anti-crash pour les environnements ne supportant pas les notifications
+    let messaging = null;
+    try {
+        messaging = getMessaging(app);
+    } catch(e) {
+        console.warn("Notifications non supportées sur ce navigateur.", e);
+    }
+
+    // Protection de la création du Service Worker (strictement bloqué sur certains serveurs/navigateurs)
+    try {
+        const swContent = `
+            importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
+            importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
+            firebase.initializeApp(${JSON.stringify(firebaseConfig)});
+            const messaging = firebase.messaging();
+            messaging.onBackgroundMessage((p) => {
+                self.registration.showNotification(p.notification.title, { 
+                    body: p.notification.body, 
+                    icon: 'https://cdn-icons-png.flaticon.com/512/8093/8093162.png' 
+                });
+            });
+        `;
+        navigator.serviceWorker.register(URL.createObjectURL(new Blob([swContent], {type: 'text/javascript'})));
+    } catch(e) {
+        console.warn("Impossible d'enregistrer le Service Worker dynamique.", e);
+    }
+
+    let myId = localStorage.getItem('tess_user');
+    let currentChatId = null; 
+    let isGroupChat = false;
+    let globalMessages = [];
+    let usersCache = {};
+    let groupsCache = {};
+
+    window.hardReset = () => { if(confirm("ÉTES VOUS SUR DE VOULOIR VOUS DÉCONNECTER?")) { localStorage.clear(); location.reload(); } };
+
+    window.doLogin = async () => {
+        const id = document.getElementById('login-id').value.trim();
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-pw').value.trim();
+        const err = document.getElementById('login-error');
+
+        if (id.length < 3 || id.length > 5 || isNaN(id)) { err.innerText = "L'ID doit faire 3 à 5 chiffres."; return; }
+        if (username.length < 2) { err.innerText = "Pseudo trop court."; return; }
+        if (password.length < 4) { err.innerText = "Le mot de passe doit faire au moins 4 caractères."; return; }
+
+        try {
+            const userDocRef = doc(db, "users", id);
+            const userSnap = await getDoc(userDocRef);
+            
+            let token = "";
+            try { 
+                if (messaging) {
+                    token = await getToken(messaging, { vapidKey: 'BD4Gyqyi5Br4OKoec1jXM9t3EACwu12v86oC43Ckuox0wb1hEnUabI7LfPgKmtBKsbSpmqz5NKIlIP1VMgcFmuY' }); 
+                }
+            } catch(e) { console.log("Notifs bloquées"); }
+
+            if (userSnap.exists()) {
+                const userData = userSnap.data();
+                if (userData.password === password) {
+                    myId = id; localStorage.setItem('tess_user', myId);
+                    await updateDoc(userDocRef, { fcmToken: token });
+                    location.reload();
+                } else { err.innerText = "ID déjà utilisé. Mot de passe incorrect."; }
+            } else {
+                myId = id; localStorage.setItem('tess_user', myId);
+                await setDoc(userDocRef, { username, password, avatar: "https://cdn-icons-png.flaticon.com/512/149/149071.png", blockedUsers: [], lastActive: Date.now(), fcmToken: token });
+                location.reload();
+            }
+        } catch (e) { err.innerText = "Erreur de connexion."; }
+    };
+
+    async function init() {
+        if (myId) {
+            document.getElementById('view-login').classList.add('hidden');
+            document.getElementById('view-list').classList.remove('hidden');
+            document.getElementById('display-my-id').innerText = "ID: " + myId;
+            const savedName = localStorage.getItem('tess_user_name');
+            if(savedName) document.getElementById('header-user-name').innerText = savedName;
+            setupListeners();
+        }
+    }
+
+    function setupListeners() {
+        let lastMsgTimestamp = Date.now();
+
+        onSnapshot(collection(db, "users"), (snap) => {
+            snap.forEach(d => usersCache[d.id] = d.data());
+            if (usersCache[myId]) {
+                document.getElementById('my-avatar').src = usersCache[myId].avatar;
+                const username = usersCache[myId].username;
+                const headerTitle = document.getElementById('header-user-name');
+                if (headerTitle) headerTitle.innerText = username;
+                localStorage.setItem('tess_user_name', username);
+            }
+            renderContactList();
+            if(currentChatId && !isGroupChat) {
+                document.getElementById('chat-avatar').src = usersCache[currentChatId]?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+            }
+        });
+
+        onSnapshot(query(collection(db, "groups"), where("members", "array-contains", myId)), (snap) => {
+            groupsCache = {};
+            snap.forEach(d => groupsCache[d.id] = {id: d.id, ...d.data()});
+            renderContactList();
+            if(currentChatId && isGroupChat && groupsCache[currentChatId]) {
+                const nicks = JSON.parse(localStorage.getItem('tess_nicks') || '{}');
+                document.getElementById('chat-title').innerText = nicks[currentChatId] || groupsCache[currentChatId].name;
+                document.getElementById('chat-avatar').src = groupsCache[currentChatId].avatar;
+            }
+        });
+
+        onSnapshot(query(collection(db, "messages"), orderBy("timestamp", "desc")), (snap) => {
+            globalMessages = []; let newMessageToNotify = null;
+            snap.forEach(d => {
+                const data = d.data();
+                if (data.sender === myId || data.receiver === myId || (data.groupId && groupsCache[data.groupId])) {
+                    globalMessages.push(data);
+                    if (data.timestamp > lastMsgTimestamp && data.sender !== myId) newMessageToNotify = data;
+                }
+            });
+            if (newMessageToNotify) {
+                showNotification(newMessageToNotify);
+                lastMsgTimestamp = newMessageToNotify.timestamp;
+            }
+            renderContactList(); if (currentChatId) renderMessages();
+        });
+    }
+
+    function getUnreadCount(chatId) {
+        const lastRead = parseInt(localStorage.getItem('read_' + chatId) || '0');
+        return globalMessages.filter(m => {
+            const incoming = m.sender !== myId;
+            const belongs = m.groupId === chatId || (m.sender === chatId && !m.groupId);
+            return belongs && incoming && m.timestamp > lastRead;
+        }).length;
+    }
+    
+    let notificationsEnabled = localStorage.getItem('tess_notifs') === 'true';
+
+    window.toggleSettings = async () => {
+        if (!notificationsEnabled) {
+            const permission = await Notification.requestPermission();
+            if (permission === "granted") { notificationsEnabled = true; alert("Notifications activées !"); } 
+            else { alert("Permission refusée par le navigateur."); notificationsEnabled = false; }
+        } else { notificationsEnabled = false; alert("Notifications désactivées."); }
+        localStorage.setItem('tess_notifs', notificationsEnabled);
+    };
+
+    function showNotification(msgData) {
+        if (!notificationsEnabled || document.visibilityState === 'visible') return;
+        if (msgData.sender === myId) return;
+        const senderName = usersCache[msgData.sender]?.username || msgData.sender;
+        const content = msgData.type === 'text' ? msgData.text : "📷 Image ou Vidéo";
+        const notif = new Notification(`Nouveau message de ${senderName}`, {
+            body: content, icon: usersCache[msgData.sender]?.avatar || 'https://cdn-icons-png.flaticon.com/512/5968/5968771.png'
+        });
+        notif.onclick = () => { window.focus(); const contact = { id: msgData.groupId || msgData.sender, type: msgData.groupId ? 'group' : 'user', name: senderName }; openChat(contact); };
+    }
+
+    function getLastMsg(chatId, isG) {
+        const m = globalMessages.find(msg => isG ? msg.groupId === chatId : (msg.sender === chatId || msg.receiver === chatId));
+        if(!m) return "Aucun message";
+        const pre = m.sender === myId ? "Vous: " : "";
+        return pre + (m.type === 'text' ? m.text : (m.type === 'img' ? "📸 Photo" : "🎥 Vidéo"));
+    }
+
+    window.renderContactList = () => {
+        const list = document.getElementById('contact-list'); list.innerHTML = "";
+        const nicks = JSON.parse(localStorage.getItem('tess_nicks') || '{}');
+        const hidden = JSON.parse(localStorage.getItem('tess_hide') || '[]');
+        let items = [];
+        for(let gId in groupsCache) if(!hidden.includes(gId)) items.push({ id: gId, name: nicks[gId] || groupsCache[gId].name, type: 'group', avatar: groupsCache[gId].avatar });
+        let contacts = JSON.parse(localStorage.getItem('tess_contacts') || '{}');
+        globalMessages.forEach(m => { if(!m.groupId && m.sender !== myId) contacts[m.sender] = {id: m.sender, type:'user'}; });
+        for(let cId in contacts) if(!hidden.includes(cId) && cId !== myId) items.push({ id: cId, name: nicks[cId] || usersCache[cId]?.username || cId, type: 'user', avatar: usersCache[cId]?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png" });
+        items.sort((a,b) => (globalMessages.find(m => b.type==='group'?m.groupId===b.id:(m.sender===b.id||m.receiver===b.id))?.timestamp||0) - (globalMessages.find(m => a.type==='group'?m.groupId===a.id:(m.sender===a.id||m.receiver===a.id))?.timestamp||0));
+        items = Array.from(new Map(items.map(i => [i.id, i])).values());
+        items.forEach(item => {
+            const unread = getUnreadCount(item.id);
+            const div = document.createElement('div'); div.className = "contact-item"; div.onclick = () => openChat(item);
+            div.innerHTML = `<img src="${item.avatar}" class="avatar"><div class="contact-info"><div class="name">${item.name}</div><div class="last-msg ${unread > 0 ? 'unread' : ''}">${getLastMsg(item.id, item.type==='group')}</div></div>${unread > 0 ? `<div class="badge-count">${unread}</div>` : ''}`;
+            list.appendChild(div);
+        });
+    };
+
+    window.openChat = (item) => {
+        currentChatId = item.id; isGroupChat = item.type === 'group';
+        document.getElementById('view-chat').classList.add('active');
+        document.getElementById('chat-title').innerText = item.name;
+        
+        // Affichage de l'ID sous le nom
+        const idSubtitle = document.getElementById('chat-id-subtitle');
+        if(idSubtitle) idSubtitle.innerText = "ID: " + item.id;
+        
+        document.getElementById('chat-avatar').src = item.avatar;
+        localStorage.setItem('read_' + currentChatId, Date.now());
+        renderMessages();
+    };
+
+    window.closeChat = () => { document.getElementById('view-chat').classList.remove('active'); currentChatId = null; renderContactList(); };
+
+    function renderMessages() {
+    const box = document.getElementById('messages'); box.innerHTML = "";
+    
+    // --- AJOUT : Récupérer le timestamp du dernier clear local ---
+    const localClearTime = parseInt(localStorage.getItem('clear_time_' + currentChatId) || '0');
+
+    const isBlocked = !isGroupChat && ((usersCache[myId]?.blockedUsers || []).includes(currentChatId) || (usersCache[currentChatId]?.blockedUsers || []).includes(myId));
+    document.getElementById('input-controls').classList.toggle('hidden', isBlocked);
+    document.getElementById('blocked-banner').classList.toggle('hidden', !isBlocked);
+    
+    // --- MODIFICATION : On ajoute la condition m.timestamp > localClearTime ---
+    const msgs = globalMessages.filter(m => {
+        const belongs = isGroupChat ? m.groupId === currentChatId : (m.sender === myId && m.receiver === currentChatId) || (m.sender === currentChatId && m.receiver === myId);
+        return belongs && m.timestamp > localClearTime; 
+    }).sort((a,b) => a.timestamp - b.timestamp);
+    
+    // ... reste du code de rendu (msgs.forEach...)
+    
+    msgs.forEach(m => {
+        const div = document.createElement('div');
+        
+        if (m.sender === "system") {
+            div.className = "msg-row";
+            div.style.justifyContent = "center";
+            // white-space: pre-wrap permet d'afficher les retours à la ligne (\n)
+            div.innerHTML = `<div style="font-size: 12px; color: #65676b; background: #f0f2f5; padding: 8px 15px; border-radius: 15px; margin: 10px 0; text-align: left; max-width: 80%; white-space: pre-wrap; border: 1px solid #e0e0e0;">${m.text}</div>`;
+        } else {
+            const isMe = m.sender === myId;
+            div.className = `msg-row ${isMe ? 'sent' : 'received'}`;
+            let contentText = m.text ? m.text.replace(/(https?:\/\/meet\.jit\.si\/[^\s]+)/g, '<button onclick="startIntegratedCall(\'$1\')" style="background:white; color:var(--blue); border-radius:10px; padding:5px 10px; border:none; font-weight:bold; margin-top:5px;">REJOINDRE L\'APPEL</button>') : '';
+            let content = m.type === 'text' ? `<div>${contentText}</div>` : `<${m.type==='img'?'img':'video'} src="${m.media}" ${m.type==='video'?'controls':''}></${m.type==='img'?'img':'video'}>`;
+            let sender = (isGroupChat && !isMe) ? `<div class="sender-name">${usersCache[m.sender]?.username || m.sender} (ID: ${m.sender})</div>` : "";
+            div.innerHTML = `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'}">${sender}<div class="msg-bubble">${content}</div></div>`;
+        }
+        box.appendChild(div);
+    });
+    box.scrollTop = box.scrollHeight;
+}
+
+
+    window.sendMessage = async () => {
+    const inp = document.getElementById('msgInput'); 
+    const text = inp.value.trim(); 
+    if(!text) return;
+    inp.value = ""; 
+
+        // --- COMMANDE /supr [nombre] (Supprimer ses propres messages) ---
+    if (text.toLowerCase().startsWith('/supr ')) {
+        const nb = parseInt(text.split(' ')[1]);
+        if (isNaN(nb) || nb <= 0) return alert("Indiquez un nombre valide.");
+
+        try {
+            let q;
+            if (isGroupChat) {
+                // IMPORTANT: On filtre d'abord par groupId pour les groupes
+                q = query(
+                    collection(db, "messages"),
+                    where("groupId", "==", currentChatId),
+                    where("sender", "==", myId),
+                    orderBy("timestamp", "desc"),
+                    limit(nb)
+                );
+            } else {
+                q = query(
+                    collection(db, "messages"),
+                    where("sender", "==", myId),
+                    where("receiver", "==", currentChatId),
+                    orderBy("timestamp", "desc"),
+                    limit(nb)
+                );
+            }
+
+            const snap = await getDocs(q);
+            if (snap.empty) return;
+            const batch = writeBatch(db);
+            snap.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        } catch (e) {
+            console.error(e);
+            alert("Erreur : Si c'est la première fois, clique sur le lien dans la console F12 pour créer l'index Firebase.");
+        }
+        return;
+    }
+
+    // --- COMMANDE /asupr [nombre] (Admin : Supprimer tout le monde) ---
+    if (text.toLowerCase().startsWith('/asupr ')) {
+        const nb = parseInt(text.split(' ')[1]);
+        if (isNaN(nb) || nb <= 0) return alert("Indiquez un nombre valide.");
+
+        const group = groupsCache[currentChatId];
+        const currentAdmins = group?.admins || [group?.createdBy];
+        
+        if (isGroupChat && !currentAdmins.includes(myId)) {
+            alert("Action refusée : Vous n'êtes pas administrateur.");
+            return;
+        }
+
+        try {
+            let q;
+            if (isGroupChat) {
+                q = query(
+                    collection(db, "messages"),
+                    where("groupId", "==", currentChatId),
+                    orderBy("timestamp", "desc"),
+                    limit(nb)
+                );
+            } else {
+                // En DM, on récupère les derniers messages sans distinction de sender
+                q = query(
+                    collection(db, "messages"),
+                    orderBy("timestamp", "desc") 
+                );
+            }
+
+            const snap = await getDocs(q);
+            const batch = writeBatch(db);
+            let deletedCount = 0;
+
+            snap.forEach(d => {
+                const m = d.data();
+                if (deletedCount < nb) {
+                    if (isGroupChat) {
+                        batch.delete(d.ref);
+                        deletedCount++;
+                    } else if ((m.sender === myId && m.receiver === currentChatId) || (m.sender === currentChatId && m.receiver === myId)) {
+                        batch.delete(d.ref);
+                        deletedCount++;
+                    }
+                }
+            });
+
+            if (deletedCount > 0) await batch.commit();
+        } catch (e) {
+            console.error(e);
+            alert("Erreur technique (vérifie la console F12).");
+        }
+        return;
+    }
+
+
+    // ... (Le reste de tes commandes /membres, /admin, /kick, etc.)
+
+    // --- COMMANDE /MEMBRES ---
+    // --- COMMANDE /ADMIN (Voir les admins) ---
+if (isGroupChat && text.toLowerCase() === '/admin') {
+    const group = groupsCache[currentChatId];
+    const adminList = group.admins || [group.createdBy];
+    let txt = "🛡️ Admins du groupe :\n";
+    adminList.forEach(id => {
+        txt += `• ${usersCache[id]?.username || 'Inconnu'} (ID: ${id})\n`;
+    });
+    await addDoc(collection(db, "messages"), { sender: "system", text: txt, timestamp: Date.now(), type: 'text', groupId: currentChatId });
+    return;
+}
+        
+// --- COMMANDE /CLEAR (Local uniquement) ---
+if (text.toLowerCase() === '/clear') {
+    if (confirm("Voulez-vous masquer les messages actuels de cette discussion pour vous-même ?")) {
+        // On enregistre l'heure actuelle comme nouveau point de départ
+        localStorage.setItem('clear_time_' + currentChatId, Date.now());
+        renderMessages(); // On rafraîchit l'affichage immédiatement
+    }
+    return; // On arrête pour ne pas envoyer le texte "/clear" comme un message
+}
+
+// --- COMMANDE /UNADMIN [ID] (Retirer les droits - Uniquement par le créateur) ---
+if (isGroupChat && text.toLowerCase().startsWith('/unadmin ')) {
+    const group = groupsCache[currentChatId];
+    
+    if (myId !== group.createdBy) {
+        alert("Action refusée : Seul le créateur du groupe peut destituer un admin.");
+        return;
+    }
+
+    const targetId = text.split(' ')[1]?.trim();
+    if (targetId === group.createdBy) {
+        alert("Impossible de retirer les droits du créateur.");
+        return;
+    }
+
+    let currentAdmins = group.admins || [group.createdBy];
+    if (!currentAdmins.includes(targetId)) {
+        alert("Cet utilisateur n'est pas administrateur.");
+        return;
+    }
+
+    const updatedAdmins = currentAdmins.filter(id => id !== targetId);
+    await updateDoc(doc(db, "groups", currentChatId), { admins: updatedAdmins });
+    
+    await addDoc(collection(db, "messages"), { 
+        sender: "system", 
+        text: `🛡️ ${usersCache[targetId]?.username || targetId} n'est plus administrateur.`, 
+        timestamp: Date.now(), 
+        type: 'text', 
+        groupId: currentChatId 
+    });
+    return;
+}
+
+// --- COMMANDE /KICK [ID] (Expulser un membre - Par n'importe quel admin) ---
+if (isGroupChat && text.toLowerCase().startsWith('/kick ')) {
+    const group = groupsCache[currentChatId];
+    const currentAdmins = group.admins || [group.createdBy];
+    
+    if (!currentAdmins.includes(myId)) {
+        alert("Action refusée : Vous n'êtes pas administrateur.");
+        return;
+    }
+
+    const targetId = text.split(' ')[1]?.trim();
+    
+    if (targetId === group.createdBy) {
+        alert("Impossible d'expulser le créateur du groupe.");
+        return;
+    }
+
+    if (!group.members.includes(targetId)) {
+        alert("L'utilisateur n'est pas dans le groupe.");
+        return;
+    }
+
+    // Mise à jour de la liste des membres et des admins (au cas où on kick un admin)
+    const updatedMembers = group.members.filter(id => id !== targetId);
+    const updatedAdmins = (group.admins || [group.createdBy]).filter(id => id !== targetId);
+    
+    await updateDoc(doc(db, "groups", currentChatId), { 
+        members: updatedMembers,
+        admins: updatedAdmins
+    });
+
+    await addDoc(collection(db, "messages"), { 
+        sender: "system", 
+        text: `🚪 ${usersCache[targetId]?.username || targetId} a été expulsé par ${usersCache[myId]?.username}.`, 
+        timestamp: Date.now(), 
+        type: 'text', 
+        groupId: currentChatId 
+    });
+    return;
+}
+        
+        
+// --- COMMANDE /ADDMIN [ID] (Nommer un nouvel admin) ---
+if (isGroupChat && text.toLowerCase().startsWith('/addmin ')) {
+    const group = groupsCache[currentChatId];
+    const currentAdmins = group.admins || [group.createdBy];
+    
+    // Vérifier si CELUI QUI TAPE LA COMMANDE est admin
+    if (!currentAdmins.includes(myId)) {
+        alert("Action refusée : Vous n'êtes pas administrateur.");
+        return;
+    }
+
+    const newAdminId = text.split(' ')[1]?.trim();
+    if (!newAdminId || !group.members.includes(newAdminId)) {
+        alert("ID invalide ou l'utilisateur n'est pas dans le groupe.");
+        return;
+    }
+
+    if (currentAdmins.includes(newAdminId)) {
+        alert("Cet utilisateur est déjà admin.");
+        return;
+    }
+
+    const updatedAdmins = [...currentAdmins, newAdminId];
+    await updateDoc(doc(db, "groups", currentChatId), { admins: updatedAdmins });
+    
+    await addDoc(collection(db, "messages"), { 
+        sender: "system", 
+        text: `🛡️ ${usersCache[newAdminId]?.username || newAdminId} a été nommé administrateur par ${usersCache[myId]?.username}.`, 
+        timestamp: Date.now(), 
+        type: 'text', 
+        groupId: currentChatId 
+    });
+    return;
+}
+    
+        
+    if (isGroupChat && (text.toLowerCase() === '/membres' || text.toLowerCase() === '/members' || text.toLowerCase() === '/membre')) {
+    const group = groupsCache[currentChatId];
+    if (group && group.members) {
+        let listeText = "👥 Membres du groupe :\n";
+        const currentAdmins = group.admins || [group.createdBy];
+        
+        group.members.forEach(id => {
+            const u = usersCache[id];
+            const pseudo = u ? u.username : "Inconnu";
+            let role = "";
+            if (id === group.createdBy) role = " 👑 (Fondateur)";
+            else if (currentAdmins.includes(id)) role = " 🛡️ (Admin)";
+            
+            listeText += `• ${pseudo} (ID: ${id})${role}\n`;
+        });
+
+        await addDoc(collection(db, "messages"), {
+            sender: "system",
+            text: listeText,
+            timestamp: Date.now(),
+            type: 'text',
+            groupId: currentChatId
+        });
+    }
+    return;
+}
+
+    // --- ENVOI NORMAL ---
+    const data = { sender: myId, text, timestamp: Date.now(), type: 'text' };
+    if(isGroupChat) data.groupId = currentChatId; else data.receiver = currentChatId;
+    
+    await addDoc(collection(db, "messages"), data);
+
+    if(!isGroupChat) {
+        const targetSnap = await getDoc(doc(db, "users", currentChatId)); 
+        const targetToken = targetSnap.data()?.fcmToken;
+        if(targetToken) {
+            // Logique de notification...
+        }
+    }
+};
+
+
+let jitsiApi = null;
+let currentCallMessageId = null;
+
+// 1. Lancer l'interface Jitsi
+window.startIntegratedCall = (link) => {
+    const container = document.getElementById('call-container');
+    container.classList.remove('hidden');
+    const roomName = link.split('/').pop().split('#')[0];
+
+    if (jitsiApi) jitsiApi.dispose();
+
+    jitsiApi = new JitsiMeetExternalAPI("meet.jit.si", {
+        roomName: roomName,
+        parentNode: container,
+        width: '100%',
+        height: '100%',
+        configOverwrite: {
+            prejoinPageEnabled: false,
+            disableDeepLinking: true,
+            startWithAudioMuted: false,
+            startWithVideoMuted: false
+        },
+        interfaceConfigOverwrite: {
+            MOBILE_APP_PROMO: false
+        }
+    });
+};
+
+// 2. Créer le lien et envoyer le message
+window.sendCallLink = async (type) => {
+    if(!currentChatId) return;
+    const roomName = `LycSudMedoc_${currentChatId}_${Math.floor(Math.random()*10000)}`;
+    const link = `https://meet.jit.si/${roomName}`;
+    
+    window.startIntegratedCall(link);
+
+    const text = `Appel ${type} en cours... ${link}`; 
+    const data = { sender: myId, text, timestamp: Date.now(), type: 'text', isCall: true };
+    if(isGroupChat) data.groupId = currentChatId; else data.receiver = currentChatId;
+    
+    const docRef = await addDoc(collection(db, "messages"), data);
+    currentCallMessageId = docRef.id; 
+};
+
+// 3. Raccrocher et supprimer le message
+window.closeCall = async () => {
+    if (currentCallMessageId) {
+        try {
+            await deleteDoc(doc(db, "messages", currentCallMessageId));
+            currentCallMessageId = null;
+        } catch (e) { console.log("Erreur suppression"); }
+    }
+
+    if (jitsiApi) {
+        jitsiApi.dispose();
+        jitsiApi = null;
+    }
+    document.getElementById('call-container').classList.add('hidden');
+    // On réinitialise le container pour garder le bouton Raccrocher
+    document.getElementById('call-container').innerHTML = '<button onclick="closeCall()" style="position:absolute; top:20px; right:20px; z-index:10000; background:red; color:white; padding:10px; border-radius:10px; font-weight:bold;">Raccrocher 📞</button>';
+};
+
+    async function compress(base64, size = 600, quality = 0.6) {
+        return new Promise(r => {
+            const img = new Image(); img.src = base64;
+            img.onload = () => {
+                const cvs = document.createElement('canvas'); const ratio = size / Math.max(img.width, img.height);
+                cvs.width = img.width * Math.min(1, ratio); cvs.height = img.height * Math.min(1, ratio);
+                cvs.getContext('2d').drawImage(img, 0, 0, cvs.width, cvs.height);
+                r(cvs.toDataURL('image/jpeg', quality));
+            };
+        });
+    }
+
+    document.getElementById('media-upload').addEventListener('change', e => {
+        const f = e.target.files[0]; if(!f) return;
+        const reader = new FileReader();
+        reader.onload = async evt => {
+            let dataUrl = evt.target.result; const type = f.type.startsWith('image') ? 'img' : 'video';
+            if(type === 'img') dataUrl = await compress(dataUrl);
+            if(dataUrl.length > 950000) return alert("Fichier trop lourd !");
+            const msg = { sender: myId, media: dataUrl, type, timestamp: Date.now() };
+            if(isGroupChat) msg.groupId = currentChatId; else msg.receiver = currentChatId;
+            await addDoc(collection(db, "messages"), msg);
+        };
+        reader.readAsDataURL(f);
+    });
+
+    document.getElementById('profile-upload').addEventListener('change', e => {
+        const f = e.target.files[0]; if(!f) return;
+        const reader = new FileReader();
+        reader.onload = async evt => {
+            const compressed = await compress(evt.target.result, 150, 0.5);
+            await updateDoc(doc(db, "users", myId), { avatar: compressed });
+        };
+        reader.readAsDataURL(f);
+    });
+    
+    // Changement de la photo de groupe (Admin uniquement)
+    document.getElementById('group-pp-upload')?.addEventListener('change', e => {
+        const f = e.target.files[0]; if(!f || !isGroupChat) return;
+        const reader = new FileReader();
+        reader.onload = async evt => {
+            const compressed = await compress(evt.target.result, 150, 0.5);
+            await updateDoc(doc(db, "groups", currentChatId), { avatar: compressed });
+            closeChatMenu();
+        };
+        reader.readAsDataURL(f);
+    });
+
+    window.openModal = (type) => {
+        const ov = document.getElementById('modal-overlay'); const t = document.getElementById('modal-title');
+        const i1 = document.getElementById('modal-input'); const i2 = document.getElementById('modal-input-2');
+        const btn = document.getElementById('modal-confirm-btn');
+        ov.classList.remove('hidden'); i2.classList.add('hidden'); i1.value = ""; document.getElementById('fab-menu').classList.remove('show');
+        
+        if(type === 'contact') {
+            t.innerText = "Ajouter un ID"; i1.placeholder = "ID à ajouter (ex: 123)";
+            btn.onclick = async () => {
+                const snap = await getDoc(doc(db, "users", i1.value.trim()));
+                if(!snap.exists()) return alert("ID inconnu");
+                let c = JSON.parse(localStorage.getItem('tess_contacts') || '{}');
+                c[i1.value.trim()] = {id: i1.value.trim(), type: 'user'};
+                localStorage.setItem('tess_contacts', JSON.stringify(c)); closeModal(); renderContactList();
+            };
+        } else if(type === 'renameLocal') {
+            t.innerText = "Surnom Local"; i1.placeholder = "Nouveau nom...";
+            btn.onclick = () => {
+                let n = JSON.parse(localStorage.getItem('tess_nicks') || '{}');
+                if(i1.value.trim()) n[currentChatId] = i1.value.trim();
+                localStorage.setItem('tess_nicks', JSON.stringify(n)); closeModal(); renderContactList();
+                document.getElementById('chat-title').innerText = i1.value.trim();
+                closeChatMenu();
+            };
+        } else if(type === 'group') {
+            t.innerText = "Créer un Groupe"; i1.placeholder = "Nom du groupe"; i2.classList.remove('hidden');
+            // Dans window.openModal -> type === 'group'
+            btn.onclick = async () => {
+                const mems = [myId, ...i2.value.split(',').map(m => m.trim()).filter(m => m)];
+                await addDoc(collection(db, "groups"), { 
+                    name: i1.value, 
+                    members: mems, 
+                    admins: [myId], // On crée une liste d'admins
+                    createdBy: myId, 
+                    avatar: "https://cdn-icons-png.flaticon.com/512/166/166258.png" 
+                });
+                closeModal();
+            };
+
+        } // Remplacez votre bloc 'addMember' par celui-ci :
+          else if(type === 'addMember') {
+              t.innerText = "Ajouter des membres"; i1.placeholder = "ID (ex: 123, 456)";
+              btn.onclick = async () => {
+                  const inputIds = i1.value.split(',').map(m => m.trim()).filter(m => m);
+                  let currentMems = groupsCache[currentChatId].members || [];
+        
+                  // On filtre pour ne garder que ceux qui ne sont pas déjà dans le groupe
+                  const newIds = inputIds.filter(id => !currentMems.includes(id));
+                  
+                  if (newIds.length > 0) {
+                      // 1. Mettre à jour les membres du groupe sur Firebase
+                      let combined = [...new Set([...currentMems, ...newIds])];
+                      await updateDoc(doc(db, "groups", currentChatId), { members: combined });
+
+                      // 2. Envoyer un message système pour chaque nouvel utilisateur
+                      for (const id of newIds) {
+                          const newUserPseudo = usersCache[id]?.username || `ID ${id}`;
+                          const adminPseudo = usersCache[myId]?.username || "Un administrateur";
+                
+                          await addDoc(collection(db, "messages"), {
+                              sender: "system", // On peut mettre "system" ou myId
+                              text: `📢 ${newUserPseudo} a été ajouté(e) au groupe par ${adminPseudo}.`,
+                              timestamp: Date.now(),
+                              type: 'text',
+                              groupId: currentChatId
+                          });
+                      }
+                  }
+                  closeModal(); closeChatMenu();
+              };
+
+        } else if(type === 'renameGroup') {
+            t.innerText = "Renommer le groupe (Global)"; i1.placeholder = "Nouveau nom...";
+            btn.onclick = async () => {
+                if(i1.value.trim()) await updateDoc(doc(db, "groups", currentChatId), { name: i1.value.trim() });
+                closeModal(); closeChatMenu();
+            };
+        }
+    };
+
+    window.closeModal = () => document.getElementById('modal-overlay').classList.add('hidden');
+    window.toggleFab = () => document.getElementById('fab-menu').classList.toggle('show');
+    
+    window.openChatMenu = () => {
+    const group = groupsCache[currentChatId];
+    // On vérifie si l'utilisateur fait partie de la liste des admins
+    const isAdmin = isGroupChat && (group?.admins || [group?.createdBy]).includes(myId);
+    
+    const blockBtn = document.getElementById('block-menu-btn');
+    if(blockBtn) {
+        blockBtn.classList.toggle('hidden', isGroupChat);
+        if(!isGroupChat) blockBtn.innerText = (usersCache[myId]?.blockedUsers || []).includes(currentChatId) ? "🔓 Débloquer" : "🚫 Bloquer";
+    }
+    
+    // On affiche les options si l'utilisateur est admin
+    document.getElementById('admin-add-member')?.classList.toggle('hidden', !isAdmin);
+    document.getElementById('admin-rename-group')?.classList.toggle('hidden', !isAdmin);
+    document.getElementById('admin-change-pp')?.classList.toggle('hidden', !isAdmin);
+
+    document.getElementById('chat-menu-overlay').classList.remove('hidden');
+};
+
+    
+    window.closeChatMenu = () => document.getElementById('chat-menu-overlay').classList.add('hidden');
+    
+    window.handleBlockToggle = async () => {
+        let b = usersCache[myId].blockedUsers || [];
+        b = b.includes(currentChatId) ? b.filter(id => id !== currentChatId) : [...b, currentChatId];
+        await updateDoc(doc(db, "users", myId), { blockedUsers: b }); closeChatMenu(); renderMessages();
+    };
+    
+    window.confirmDeleteChat = () => {
+        if(confirm("Masquer cette discussion ?")) {
+            let h = JSON.parse(localStorage.getItem('tess_hide') || '[]');
+            h.push(currentChatId); localStorage.setItem('tess_hide', JSON.stringify(h));
+            closeChat(); closeChatMenu();
+        }
+    };
+    
+    window.filterContacts = (v) => Array.from(document.getElementById('contact-list').children).forEach(c => c.style.display = c.innerText.toLowerCase().includes(v.toLowerCase())?'flex':'none');
+    
+    init();
+</script>
+    
+<div id="call-container" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:9999;">
+    <button onclick="closeCall()" style="position:absolute; top:20px; right:20px; z-index:10000; background:red; color:white; padding:10px; border-radius:10px; font-weight:bold;">Raccrocher 📞</button>
+</div>
+
+    
+</body>
+</html>
