@@ -84,6 +84,23 @@
 
         @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        /* --- TOAST CUSTOM --- */
+        .custom-toast { position: fixed; top: 30px; left: 50%; transform: translateX(-50%) translateY(-20px); background: #323232; color: white; padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 500; z-index: 99999; opacity: 0; transition: all 0.3s ease; pointer-events: none; max-width: 85%; text-align: center; box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+        .custom-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .custom-toast.error { background: #d32f2f; }
+        .custom-toast.success { background: #2e7d32; }
+        .custom-toast.warning { background: #ed6c02; }
+
+        /* --- CONFIRM CUSTOM --- */
+        .confirm-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 90000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .confirm-box { background: white; width: 85%; max-width: 320px; border-radius: 20px; padding: 25px; animation: pop 0.2s; text-align: center; }
+        .confirm-box p { font-size: 16px; font-weight: 600; margin: 0 0 20px 0; color: #333; line-height: 1.4; }
+        .confirm-btns { display: flex; gap: 10px; }
+        .confirm-btns button { flex: 1; padding: 12px; border-radius: 12px; font-weight: bold; font-size: 15px; border: none; cursor: pointer; }
+        .confirm-btns .btn-cancel { background: #f0f2f5; color: #333; }
+        .confirm-btns .btn-confirm { background: var(--blue); color: white; }
+        .confirm-btns .btn-danger { background: var(--red); color: white; }
     </style>
 </head>
 <body>
@@ -241,6 +258,28 @@
         console.warn("Impossible d'enregistrer le Service Worker dynamique.", e);
     }
 
+    // --- TOAST & CONFIRM CUSTOM ---
+    function toast(msg, type = '') {
+        const el = document.createElement('div');
+        el.className = 'custom-toast' + (type ? ' ' + type : '');
+        el.textContent = msg;
+        document.body.appendChild(el);
+        requestAnimationFrame(() => el.classList.add('show'));
+        setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2800);
+    }
+
+    function customConfirm(msg, danger = false) {
+        return new Promise(resolve => {
+            const ov = document.createElement('div');
+            ov.className = 'confirm-overlay';
+            const btnClass = danger ? 'btn-danger' : 'btn-confirm';
+            ov.innerHTML = `<div class="confirm-box"><p>${msg}</p><div class="confirm-btns"><button class="btn-cancel">Annuler</button><button class="${btnClass}">Confirmer</button></div></div>`;
+            document.body.appendChild(ov);
+            ov.querySelector('.btn-cancel').onclick = () => { ov.remove(); resolve(false); };
+            ov.querySelector('.' + btnClass).onclick = () => { ov.remove(); resolve(true); };
+        });
+    }
+
     let myId = localStorage.getItem('tess_user');
     let currentChatId = null; 
     let isGroupChat = false;
@@ -248,7 +287,7 @@
     let usersCache = {};
     let groupsCache = {};
 
-    window.hardReset = () => { if(confirm("ÉTES VOUS SUR DE VOULOIR VOUS DÉCONNECTER?")) { localStorage.clear(); location.reload(); } };
+    window.hardReset = async () => { if(await customConfirm("Êtes-vous sûr de vouloir vous déconnecter ?", true)) { localStorage.clear(); location.reload(); } };
 
     window.doLogin = async () => {
         const id = document.getElementById('login-id').value.trim();
@@ -357,9 +396,9 @@
     window.toggleSettings = async () => {
         if (!notificationsEnabled) {
             const permission = await Notification.requestPermission();
-            if (permission === "granted") { notificationsEnabled = true; alert("Notifications activées !"); } 
-            else { alert("Permission refusée par le navigateur."); notificationsEnabled = false; }
-        } else { notificationsEnabled = false; alert("Notifications désactivées."); }
+            if (permission === "granted") { notificationsEnabled = true; toast("Notifications activées !", "success"); } 
+            else { toast("Permission refusée par le navigateur.", "error"); notificationsEnabled = false; }
+        } else { notificationsEnabled = false; toast("Notifications désactivées.", "warning"); }
         localStorage.setItem('tess_notifs', notificationsEnabled);
     };
 
@@ -465,7 +504,7 @@
         // --- COMMANDE /supr [nombre] (Supprimer ses propres messages) ---
     if (text.toLowerCase().startsWith('/supr ')) {
         const nb = parseInt(text.split(' ')[1]);
-        if (isNaN(nb) || nb <= 0) return alert("Indiquez un nombre valide.");
+        if (isNaN(nb) || nb <= 0) return toast("Indiquez un nombre valide.", "error");
 
         try {
             let q;
@@ -495,7 +534,7 @@
             await batch.commit();
         } catch (e) {
             console.error(e);
-            alert("Erreur : Si c'est la première fois, clique sur le lien dans la console F12 pour créer l'index Firebase.");
+            toast("Erreur : Clique sur le lien dans la console F12 pour créer l'index Firebase.", "error");
         }
         return;
     }
@@ -503,13 +542,13 @@
     // --- COMMANDE /asupr [nombre] (Admin : Supprimer tout le monde) ---
     if (text.toLowerCase().startsWith('/asupr ')) {
         const nb = parseInt(text.split(' ')[1]);
-        if (isNaN(nb) || nb <= 0) return alert("Indiquez un nombre valide.");
+        if (isNaN(nb) || nb <= 0) return toast("Indiquez un nombre valide.", "error");
 
         const group = groupsCache[currentChatId];
         const currentAdmins = group?.admins || [group?.createdBy];
         
         if (isGroupChat && !currentAdmins.includes(myId)) {
-            alert("Action refusée : Vous n'êtes pas administrateur.");
+            toast("Action refusée : Vous n'êtes pas administrateur.", "error");
             return;
         }
 
@@ -550,7 +589,7 @@
             if (deletedCount > 0) await batch.commit();
         } catch (e) {
             console.error(e);
-            alert("Erreur technique (vérifie la console F12).");
+            toast("Erreur technique (vérifie la console F12).", "error");
         }
         return;
     }
@@ -573,10 +612,10 @@ if (isGroupChat && text.toLowerCase() === '/admin') {
         
 // --- COMMANDE /CLEAR (Local uniquement) ---
 if (text.toLowerCase() === '/clear') {
-    if (confirm("Voulez-vous masquer les messages actuels de cette discussion pour vous-même ?")) {
-        // On enregistre l'heure actuelle comme nouveau point de départ
+    const ok = await customConfirm("Voulez-vous masquer les messages actuels de cette discussion pour vous-même ?");
+    if (ok) {
         localStorage.setItem('clear_time_' + currentChatId, Date.now());
-        renderMessages(); // On rafraîchit l'affichage immédiatement
+        renderMessages();
     }
     return; // On arrête pour ne pas envoyer le texte "/clear" comme un message
 }
@@ -586,19 +625,19 @@ if (isGroupChat && text.toLowerCase().startsWith('/unadmin ')) {
     const group = groupsCache[currentChatId];
     
     if (myId !== group.createdBy) {
-        alert("Action refusée : Seul le créateur du groupe peut destituer un admin.");
+        toast("Action refusée : Seul le créateur du groupe peut destituer un admin.", "error");
         return;
     }
 
     const targetId = text.split(' ')[1]?.trim();
     if (targetId === group.createdBy) {
-        alert("Impossible de retirer les droits du créateur.");
+        toast("Impossible de retirer les droits du créateur.", "error");
         return;
     }
 
     let currentAdmins = group.admins || [group.createdBy];
     if (!currentAdmins.includes(targetId)) {
-        alert("Cet utilisateur n'est pas administrateur.");
+        toast("Cet utilisateur n'est pas administrateur.", "error");
         return;
     }
 
@@ -621,19 +660,19 @@ if (isGroupChat && text.toLowerCase().startsWith('/kick ')) {
     const currentAdmins = group.admins || [group.createdBy];
     
     if (!currentAdmins.includes(myId)) {
-        alert("Action refusée : Vous n'êtes pas administrateur.");
+        toast("Action refusée : Vous n'êtes pas administrateur.", "error");
         return;
     }
 
     const targetId = text.split(' ')[1]?.trim();
     
     if (targetId === group.createdBy) {
-        alert("Impossible d'expulser le créateur du groupe.");
+        toast("Impossible d'expulser le créateur du groupe.", "error");
         return;
     }
 
     if (!group.members.includes(targetId)) {
-        alert("L'utilisateur n'est pas dans le groupe.");
+        toast("L'utilisateur n'est pas dans le groupe.", "error");
         return;
     }
 
@@ -664,18 +703,18 @@ if (isGroupChat && text.toLowerCase().startsWith('/addmin ')) {
     
     // Vérifier si CELUI QUI TAPE LA COMMANDE est admin
     if (!currentAdmins.includes(myId)) {
-        alert("Action refusée : Vous n'êtes pas administrateur.");
+        toast("Action refusée : Vous n'êtes pas administrateur.", "error");
         return;
     }
 
     const newAdminId = text.split(' ')[1]?.trim();
     if (!newAdminId || !group.members.includes(newAdminId)) {
-        alert("ID invalide ou l'utilisateur n'est pas dans le groupe.");
+        toast("ID invalide ou l'utilisateur n'est pas dans le groupe.", "error");
         return;
     }
 
     if (currentAdmins.includes(newAdminId)) {
-        alert("Cet utilisateur est déjà admin.");
+        toast("Cet utilisateur est déjà admin.", "warning");
         return;
     }
 
@@ -816,7 +855,7 @@ window.closeCall = async () => {
         reader.onload = async evt => {
             let dataUrl = evt.target.result; const type = f.type.startsWith('image') ? 'img' : 'video';
             if(type === 'img') dataUrl = await compress(dataUrl);
-            if(dataUrl.length > 950000) return alert("Fichier trop lourd !");
+            if(dataUrl.length > 950000) return toast("Fichier trop lourd !", "error");
             const msg = { sender: myId, media: dataUrl, type, timestamp: Date.now() };
             if(isGroupChat) msg.groupId = currentChatId; else msg.receiver = currentChatId;
             await addDoc(collection(db, "messages"), msg);
@@ -856,7 +895,7 @@ window.closeCall = async () => {
             t.innerText = "Ajouter un ID"; i1.placeholder = "ID à ajouter (ex: 123)";
             btn.onclick = async () => {
                 const snap = await getDoc(doc(db, "users", i1.value.trim()));
-                if(!snap.exists()) return alert("ID inconnu");
+                if(!snap.exists()) return toast("ID inconnu", "error");
                 let c = JSON.parse(localStorage.getItem('tess_contacts') || '{}');
                 c[i1.value.trim()] = {id: i1.value.trim(), type: 'user'};
                 localStorage.setItem('tess_contacts', JSON.stringify(c)); closeModal(); renderContactList();
@@ -957,8 +996,8 @@ window.closeCall = async () => {
         await updateDoc(doc(db, "users", myId), { blockedUsers: b }); closeChatMenu(); renderMessages();
     };
     
-    window.confirmDeleteChat = () => {
-        if(confirm("Masquer cette discussion ?")) {
+    window.confirmDeleteChat = async () => {
+        if(await customConfirm("Masquer cette discussion ?", true)) {
             let h = JSON.parse(localStorage.getItem('tess_hide') || '[]');
             h.push(currentChatId); localStorage.setItem('tess_hide', JSON.stringify(h));
             closeChat(); closeChatMenu();
