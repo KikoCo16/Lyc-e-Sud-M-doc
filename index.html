@@ -23,17 +23,461 @@
 
         /* --- UI PRINCIPALE --- */
         .header { background: white; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; height: 65px; border-bottom: 1px solid #eee; position: sticky; top: 0; }
-        .header-title { font-weight: 800; font-size: 26px; }
-        .avatar { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: #eee; flex-shrink: 0; border: 1px solid #ddd; cursor: pointer; }
+        .header-title { font-weight: 800; font-size: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+        .avatar { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: #eee; flex-shrink: 0; border: 1px solid #ddd; }
         #view-list { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
         .search-bar { padding: 10px 15px; }
         .search-input { width: 100%; background: var(--gray); border: none; padding: 12px 18px; border-radius: 25px; font-size: 15px; outline: none;}
         #contact-list { flex: 1; overflow-y: auto; padding-bottom: 80px; }
         .contact-item { padding: 12px 15px; display: flex; align-items: center; gap: 12px; position: relative; cursor: pointer; border-bottom: 1px solid #fafafa; }
-        .contact-item:active, .contact-item:hover { background: #f2f2f2; }
+        .contact-item:active { background: #f2f2f2; }
         .name { font-weight: 600; font-size: 16px; }
         .last-msg { font-size: 14px; color: #65676b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+        /* --- CHAT --- */
+        #view-chat { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 2000; display: flex; flex-direction: column; transform: translateX(100%); transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #view-chat.active { transform: translateX(0); }
+        #messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .msg-row { display: flex; align-items: flex-end; gap: 8px; width: 100%; }
+        .msg-bubble { padding: 10px 14px; border-radius: 20px; font-size: 15px; max-width: 75vw; line-height: 1.4; word-wrap: break-word; }
+        .msg-row.sent { justify-content: flex-end; }
+        .msg-row.sent .msg-bubble { background: var(--blue); color: white; border-bottom-right-radius: 4px; }
+        .msg-row.received .msg-bubble { background: var(--gray); color: black; border-bottom-left-radius: 4px; }
+        .msg-bubble img, .msg-bubble video { max-width: 100%; border-radius: 12px; display: block; margin-top: 5px; }
+        .input-area { border-top: 1px solid #eee; padding: 10px; display: flex; align-items: center; gap: 10px; background: white; }
+        .input-text { flex: 1; background: var(--gray); border: none; padding: 12px 18px; border-radius: 25px; font-size: 16px; outline: none; }
+
+        /* --- MODALS & TOASTS --- */
+        #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { background: #333; color: white; padding: 12px 24px; border-radius: 30px; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: toastFadeIn 0.3s, toastFadeOut 0.3s 2.7s forwards; text-align: center; }
+        .toast.error { background: var(--red); }
+        .toast.success { background: var(--green); }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 4000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .modal-box { background: white; width: 85%; max-width: 350px; border-radius: 20px; padding: 25px; }
+
+        /* --- FAB --- */
+        .fab { position: fixed; bottom: 25px; right: 25px; width: 56px; height: 56px; background: var(--blue); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 30px; box-shadow: 0 5px 15px rgba(0,132,255,0.4); z-index: 100; }
+        .fab-menu { position: fixed; bottom: 95px; right: 25px; display: flex; flex-direction: column; gap: 12px; opacity: 0; pointer-events: none; transition: 0.3s; transform: translateY(10px); }
+        .fab-menu.show { opacity: 1; pointer-events: all; transform: translateY(0); }
+        .fab-item { background: white; padding: 12px 20px; border-radius: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); font-weight: 600; cursor: pointer; }
+
+        .chat-menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 5000; display: flex; align-items: flex-end; }
+        .chat-menu-box { width: 100%; background: white; border-radius: 25px 25px 0 0; padding: 20px; }
+        .chat-menu-item { padding: 15px; border-bottom: 1px solid #eee; font-weight: 500; cursor: pointer; }
+
+        @keyframes toastFadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes toastFadeOut { from { opacity: 1; } to { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <div id="toast-container"></div>
+
+    <div id="view-login">
+        <img src="https://cdn-icons-png.flaticon.com/512/8093/8093162.png" class="login-logo">
+        <div class="login-title">Lycée Sud Médoc</div>
+        <input type="text" id="login-username" class="login-input" placeholder="Pseudo (Inscription)">
+        <input type="number" id="login-id" class="login-input" placeholder="ID (3 à 5 chiffres)">
+        <input type="password" id="login-pw" class="login-input" placeholder="Mot de passe">
+        <button class="btn-primary" onclick="doLogin()">CONNEXION</button>
+        <div id="login-error" style="color:var(--red); font-size:13px; margin-top:10px; text-align: center;"></div>
+    </div>
+
+    <div id="view-list" class="hidden">
+        <div class="header">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="position: relative; cursor: pointer;">
+                    <label for="profile-upload" style="cursor:pointer;">
+                        <img id="my-avatar" class="avatar" src="https://cdn-icons-png.flaticon.com/512/149/149071.png">
+                        <div style="position: absolute; bottom: -2px; right: -2px; background: var(--blue); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">✏️</div>
+                    </label>
+                    <input type="file" id="profile-upload" class="hidden" accept="image/*">
+                </div>
+                <div>
+                    <div class="header-title" id="header-user-name">Chargement...</div>
+                    <div id="display-my-id" style="font-size: 11px; color: #888; font-weight: 600;">ID: ----</div>
+                </div>
+            </div>
+            <button onclick="requestLogout()" style="color:#aaa; background:none; font-size:11px; font-weight:bold;">QUITTER</button>
+        </div>
+        <div class="search-bar">
+            <input type="text" class="search-input" placeholder="Rechercher..." oninput="filterContacts(this.value)">
+        </div>
+        <div id="contact-list"></div>
+        <div class="fab-menu" id="fab-menu">
+            <div class="fab-item" onclick="openGenericModal('group')">Nouveau Groupe 👥</div>
+            <div class="fab-item" onclick="openGenericModal('contact')">Ajouter un ID 👤</div>
+        </div>
+        <div class="fab" onclick="toggleFab()">+</div>
+    </div>
+
+    <div id="view-chat">
+        <div class="header">
+            <button onclick="closeChat()" style="color:var(--blue); background:none; font-size:28px;">←</button>
+            <div style="display:flex; align-items:center; gap:12px; flex: 1; overflow: hidden;">
+                <img id="chat-avatar" class="avatar" style="width:38px; height:38px;">
+                <div style="display:flex; flex-direction:column; overflow: hidden;">
+                    <span id="chat-title" style="font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+                    <span id="chat-id-subtitle" style="font-size: 10px; color: #888;"></span>
+                </div>
+            </div>
+            <div style="display:flex; gap:12px;">
+                <button onclick="sendCallLink('audio')" style="background:none; font-size:18px;">📞</button>
+                <button onclick="sendCallLink('video')" style="background:none; font-size:18px;">🎥</button>
+                <button onclick="openChatMenu()" style="background:none; font-size:22px; color:var(--blue);">⋮</button>
+            </div>
+        </div>
+        <div id="messages"></div>
+        <div id="blocked-banner" class="hidden" style="padding:15px; text-align:center; background:#ffebee; color:var(--red); font-weight:bold; font-size: 12px;">Conversation Bloquée</div>
+        <div class="input-area" id="input-controls">
+            <label for="media-upload" style="font-size:24px; cursor:pointer;">🖼️</label>
+            <input type="file" id="media-upload" class="hidden" accept="image/*,video/*">
+            <input type="text" id="msgInput" class="input-text" placeholder="Aa" onkeypress="if(event.key==='Enter') sendMessage()">
+            <span style="font-size:24px; color:var(--blue); cursor:pointer;" onclick="sendMessage()">➤</span>
+        </div>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div id="modal-title" style="font-weight:bold; margin-bottom:15px; font-size: 16px; text-align: center;"></div>
+            <input type="text" id="modal-input" class="login-input" style="background:#f0f2f5; text-align:left; width: 100%;">
+            <input type="text" id="modal-input-2" class="login-input hidden" placeholder="Membres (ex: 123, 456)" style="background:#f0f2f5; text-align:left; width: 100%;">
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button onclick="closeModal()" style="flex:1; padding:12px; background:#eee; border-radius:12px; font-weight:bold;">Annuler</button>
+                <button id="modal-confirm-btn" style="flex:1; padding:12px; background:var(--blue); color:white; border-radius:12px; font-weight:bold;">Valider</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm-overlay" class="modal-overlay hidden" onclick="closeConfirmModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div id="confirm-msg" style="margin-bottom:20px; font-size: 15px; text-align: center; line-height:1.4;"></div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeConfirmModal()" style="flex:1; padding:12px; background:#eee; border-radius:12px; font-weight:bold;">Annuler</button>
+                <button id="confirm-yes-btn" style="flex:1; padding:12px; background:var(--red); color:white; border-radius:12px; font-weight:bold;">Confirmer</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-menu-overlay" class="chat-menu-overlay hidden" onclick="closeChatMenu()">
+        <div class="chat-menu-box" onclick="event.stopPropagation()">
+            <div class="chat-menu-item" onclick="openGenericModal('renameLocal')">✏️ Renommer localement</div>
+            <div id="block-menu-btn" class="chat-menu-item" onclick="handleBlockToggle()">🚫 Bloquer</div>
+            <div id="admin-add-member" class="chat-menu-item hidden" onclick="openGenericModal('addMember')">👤 Ajouter des membres</div>
+            <div id="admin-rename-group" class="chat-menu-item hidden" onclick="openGenericModal('renameGroup')">✏️ Renommer le groupe</div>
+            <div class="chat-menu-item" onclick="requestDeleteChat()" style="color:var(--red);">🗑️ Masquer la discussion</div>
+        </div>
+    </div>
+
+    <div id="call-container" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:9999;">
+        <button onclick="closeCall()" style="position:absolute; top:20px; right:20px; z-index:10001; background:red; color:white; padding:12px; border-radius:10px; font-weight:bold;">Raccrocher 📞</button>
+    </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAHZTBnuW-2RStrryJVqxWJ1tpD4LLaeq8",
+        authDomain: "messenger-ed88b.firebaseapp.com",
+        projectId: "messenger-ed88b",
+        storageBucket: "messenger-ed88b.firebasestorage.app",
+        messagingSenderId: "625422257839",
+        appId: "1:625422257839:web:a85ce9402d2ae58cc9ce5a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let myId = null;
+    let currentChatId = null; 
+    let isGroupChat = false;
+    let globalMessages = [];
+    let usersCache = {};
+    let groupsCache = {};
+    let jitsiApi = null;
+    let confirmCallback = null;
+
+    function escapeHTML(str) {
+        if (typeof str !== 'string') return '';
+        return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+    }
+
+    window.showToast = (message, type = 'normal') => {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type === 'error' ? 'error' : type === 'success' ? 'success' : ''}`;
+        toast.innerText = message;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    };
+
+    window.askConfirm = (message, callback) => {
+        document.getElementById('confirm-msg').innerText = message;
+        document.getElementById('confirm-overlay').classList.remove('hidden');
+        confirmCallback = callback;
+    };
+    
+    window.closeConfirmModal = () => {
+        document.getElementById('confirm-overlay').classList.add('hidden');
+        confirmCallback = null;
+    };
+
+    document.getElementById('confirm-yes-btn').onclick = () => {
+        if(confirmCallback) confirmCallback();
+        window.closeConfirmModal();
+    };
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            myId = user.email.split('@')[0];
+            document.getElementById('view-login').classList.add('hidden');
+            document.getElementById('view-list').classList.remove('hidden');
+            document.getElementById('display-my-id').innerText = "Mon ID: " + myId;
+            setupListeners();
+        } else {
+            document.getElementById('view-login').classList.remove('hidden');
+            document.getElementById('view-list').classList.add('hidden');
+        }
+    });
+
+    window.doLogin = async () => {
+        const id = document.getElementById('login-id').value.trim();
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-pw').value.trim();
+        const err = document.getElementById('login-error');
+        if (!id || !password) return err.innerText = "ID et mot de passe requis.";
+        const fakeEmail = `${id}@lyceesudmedoc.app`;
+
+        try {
+            await signInWithEmailAndPassword(auth, fakeEmail, password);
+        } catch (error) {
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                if (!username) return err.innerText = "Pseudo requis pour l'inscription.";
+                try {
+                    await createUserWithEmailAndPassword(auth, fakeEmail, password);
+                    await setDoc(doc(db, "users", id), { username, avatar: "https://cdn-icons-png.flaticon.com/512/149/149071.png", blockedUsers: [] });
+                } catch(e) { err.innerText = "Erreur: " + e.message; }
+            } else { err.innerText = "Erreur de connexion."; }
+        }
+    };
+
+    window.requestLogout = () => {
+        window.askConfirm("Voulez-vous vous déconnecter ?", () => signOut(auth).then(() => localStorage.clear()));
+    };
+
+    function setupListeners() {
+        onSnapshot(collection(db, "users"), (snap) => {
+            snap.forEach(d => usersCache[d.id] = d.data());
+            if (usersCache[myId]) {
+                document.getElementById('my-avatar').src = usersCache[myId].avatar;
+                document.getElementById('header-user-name').innerText = usersCache[myId].username;
+            }
+            renderContactList();
+        });
+
+        onSnapshot(query(collection(db, "groups"), where("members", "array-contains", myId)), (snap) => {
+            groupsCache = {}; snap.forEach(d => groupsCache[d.id] = {id: d.id, ...d.data()});
+            renderContactList();
+        });
+
+        onSnapshot(query(collection(db, "messages"), orderBy("timestamp", "desc")), (snap) => {
+            globalMessages = [];
+            snap.forEach(d => {
+                const data = d.data();
+                if (data.sender === myId || data.receiver === myId || (data.groupId && groupsCache[data.groupId])) {
+                    globalMessages.push({id: d.id, ...data});
+                }
+            });
+            renderContactList(); if (currentChatId) renderMessages();
+        });
+    }
+
+    window.renderContactList = () => {
+        const list = document.getElementById('contact-list'); list.innerHTML = "";
+        const nicks = JSON.parse(localStorage.getItem('tess_nicks') || '{}');
+        const hidden = JSON.parse(localStorage.getItem('tess_hide') || '[]');
+        let items = [];
+
+        for(let gId in groupsCache) if(!hidden.includes(gId)) items.push({ id: gId, name: nicks[gId] || groupsCache[gId].name, type: 'group', avatar: groupsCache[gId].avatar });
+        let contacts = JSON.parse(localStorage.getItem('tess_contacts') || '{}');
+        globalMessages.forEach(m => { if(!m.groupId && m.sender !== myId) contacts[m.sender] = {id: m.sender, type:'user'}; });
+        for(let cId in contacts) if(!hidden.includes(cId) && cId !== myId) items.push({ id: cId, name: nicks[cId] || usersCache[cId]?.username || cId, type: 'user', avatar: usersCache[cId]?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png" });
+
+        items.forEach(item => {
+            const div = document.createElement('div'); div.className = "contact-item";
+            div.setAttribute('data-name', item.name.toLowerCase());
+            div.onclick = () => openChat(item);
+            div.innerHTML = `<img src="${item.avatar}" class="avatar"><div><div class="name">${escapeHTML(item.name)}</div><div class="last-msg">ID: ${item.id}</div></div>`;
+            list.appendChild(div);
+        });
+    };
+
+    window.filterContacts = (val) => {
+        const term = val.toLowerCase();
+        document.querySelectorAll('.contact-item').forEach(el => {
+            el.style.display = el.getAttribute('data-name').includes(term) ? 'flex' : 'none';
+        });
+    };
+
+    window.openChat = (item) => {
+        currentChatId = item.id; isGroupChat = item.type === 'group';
+        document.getElementById('view-chat').classList.add('active');
+        document.getElementById('chat-title').innerText = item.name;
+        document.getElementById('chat-id-subtitle').innerText = "ID: " + item.id;
+        document.getElementById('chat-avatar').src = item.avatar;
+        checkBlockStatus();
+        renderMessages();
+    };
+
+    window.closeChat = () => { document.getElementById('view-chat').classList.remove('active'); currentChatId = null; };
+
+    function checkBlockStatus() {
+        const myData = usersCache[myId];
+        const isBlocked = myData?.blockedUsers?.includes(currentChatId);
+        document.getElementById('blocked-banner').classList.toggle('hidden', !isBlocked || isGroupChat);
+        document.getElementById('input-controls').classList.toggle('hidden', isBlocked && !isGroupChat);
+        const blockBtn = document.getElementById('block-menu-btn');
+        if(blockBtn) blockBtn.innerText = isBlocked ? "✅ Débloquer" : "🚫 Bloquer";
+    }
+
+    function renderMessages() {
+        const box = document.getElementById('messages'); box.innerHTML = "";
+        const localClearTime = parseInt(localStorage.getItem('clear_time_' + currentChatId) || '0');
+        const msgs = globalMessages.filter(m => {
+            const belongs = isGroupChat ? m.groupId === currentChatId : (m.sender === myId && m.receiver === currentChatId) || (m.sender === currentChatId && m.receiver === myId);
+            return belongs && m.timestamp > localClearTime;
+        }).sort((a,b) => a.timestamp - b.timestamp);
+
+        msgs.forEach(m => {
+            const isMe = m.sender === myId;
+            const div = document.createElement('div');
+            div.className = `msg-row ${isMe ? 'sent' : 'received'}`;
+            let content = "";
+            if (m.type === 'text') {
+                let txt = escapeHTML(m.text);
+                txt = txt.replace(/(https?:\/\/meet\.jit\.si\/[^\s]+)/g, '<button onclick="startIntegratedCall(\'$1\')" style="padding:5px; border-radius:5px; border:none; background:white; color:blue; font-weight:bold;">REJOINDRE L\'APPEL</button>');
+                content = `<div>${txt}</div>`;
+            } else {
+                content = `<${m.type==='img'?'img':'video'} src="${m.media}" ${m.type==='video'?'controls':''}></${m.type==='img'?'img':'video'}>`;
+            }
+            const senderName = isGroupChat && !isMe ? `<div style="font-size:10px; color:#888;">${usersCache[m.sender]?.username || m.sender}</div>` : "";
+            div.innerHTML = `<div>${senderName}<div class="msg-bubble">${content}</div></div>`;
+            box.appendChild(div);
+        });
+        box.scrollTop = box.scrollHeight;
+    }
+
+    window.sendMessage = async () => {
+        const inp = document.getElementById('msgInput');
+        const text = inp.value.trim();
+        if(!text) return; inp.value = "";
+        if (text === '/clear') { localStorage.setItem('clear_time_' + currentChatId, Date.now()); return renderMessages(); }
+        const data = { sender: myId, text, timestamp: Date.now(), type: 'text' };
+        if(isGroupChat) data.groupId = currentChatId; else data.receiver = currentChatId;
+        await addDoc(collection(db, "messages"), data);
+    };
+
+    document.getElementById('profile-upload').addEventListener('change', async e => {
+        const file = e.target.files[0]; if(!file) return;
+        if(file.size > 1048576) return window.showToast("Image trop grande (max 1Mo)", "error");
+        const reader = new FileReader();
+        reader.onload = async evt => {
+            try {
+                document.getElementById('my-avatar').src = evt.target.result;
+                await updateDoc(doc(db, "users", myId), { avatar: evt.target.result });
+                window.showToast("Photo mise à jour !", "success");
+            } catch(e) { window.showToast("Erreur d'upload", "error"); }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    document.getElementById('media-upload').addEventListener('change', async e => {
+        const file = e.target.files[0]; if(!file) return;
+        const reader = new FileReader();
+        reader.onload = async evt => {
+            const type = file.type.startsWith('image') ? 'img' : 'video';
+            const data = { sender: myId, media: evt.target.result, type, timestamp: Date.now() };
+            if(isGroupChat) data.groupId = currentChatId; else data.receiver = currentChatId;
+            await addDoc(collection(db, "messages"), data);
+        };
+        reader.readAsDataURL(file);
+    });
+
+    window.sendCallLink = async (type) => {
+        const room = `SM_${myId}_${Math.floor(Math.random()*1000)}`;
+        const link = `https://meet.jit.si/${room}`;
+        startIntegratedCall(link);
+        const data = { sender: myId, text: `Appel en cours... ${link}`, timestamp: Date.now(), type: 'text' };
+        if(isGroupChat) data.groupId = currentChatId; else data.receiver = currentChatId;
+        await addDoc(collection(db, "messages"), data);
+    };
+
+    window.startIntegratedCall = (link) => {
+        const room = link.split('/').pop();
+        document.getElementById('call-container').classList.remove('hidden');
+        jitsiApi = new JitsiMeetExternalAPI("meet.jit.si", { roomName: room, parentNode: document.getElementById('call-container'), width: '100%', height: '100%' });
+    };
+
+    window.closeCall = () => { if(jitsiApi) jitsiApi.dispose(); document.getElementById('call-container').classList.add('hidden'); };
+
+    window.toggleFab = () => document.getElementById('fab-menu').classList.toggle('show');
+
+    let currentModalAction = null;
+    window.openGenericModal = (type) => {
+        currentModalAction = type;
+        const m = document.getElementById('modal-overlay'); m.classList.remove('hidden');
+        document.getElementById('modal-input-2').classList.toggle('hidden', type !== 'group');
+        document.getElementById('modal-title').innerText = type === 'group' ? "Nouveau Groupe" : type === 'contact' ? "Ajouter un ID" : "Action";
+        document.getElementById('fab-menu').classList.remove('show');
+    };
+    window.closeModal = () => document.getElementById('modal-overlay').classList.add('hidden');
+
+    document.getElementById('modal-confirm-btn').onclick = async () => {
+        const val = document.getElementById('modal-input').value.trim();
+        const val2 = document.getElementById('modal-input-2').value.trim();
+        if(!val) return;
+        if(currentModalAction === 'contact') {
+            let c = JSON.parse(localStorage.getItem('tess_contacts') || '{}');
+            c[val] = {id: val, type: 'user'};
+            localStorage.setItem('tess_contacts', JSON.stringify(c));
+        } else if(currentModalAction === 'group') {
+            const mems = [myId, ...val2.split(',').map(x => x.trim())];
+            await addDoc(collection(db, "groups"), { name: val, members: mems, createdBy: myId, avatar: "https://cdn-icons-png.flaticon.com/512/166/166258.png" });
+        } else if(currentModalAction === 'renameLocal') {
+            let n = JSON.parse(localStorage.getItem('tess_nicks') || '{}');
+            n[currentChatId] = val; localStorage.setItem('tess_nicks', JSON.stringify(n));
+        }
+        closeModal(); renderContactList();
+    };
+
+    window.openChatMenu = () => document.getElementById('chat-menu-overlay').classList.remove('hidden');
+    window.closeChatMenu = () => document.getElementById('chat-menu-overlay').classList.add('hidden');
+    window.requestDeleteChat = () => {
+        window.closeChatMenu();
+        window.askConfirm("Masquer cette discussion ?", () => {
+            let h = JSON.parse(localStorage.getItem('tess_hide') || '[]');
+            h.push(currentChatId); localStorage.setItem('tess_hide', JSON.stringify(h));
+            closeChat(); renderContactList();
+        });
+    };
+
+    window.handleBlockToggle = async () => {
+        window.closeChatMenu();
+        const myData = usersCache[myId];
+        let blocked = myData.blockedUsers || [];
+        if(blocked.includes(currentChatId)) blocked = blocked.filter(x => x !== currentChatId);
+        else blocked.push(currentChatId);
+        await updateDoc(doc(db, "users", myId), { blockedUsers: blocked });
+        window.showToast(blocked.includes(currentChatId) ? "Bloqué" : "Débloqué");
+        checkBlockStatus();
+    };
+
+</script>
+</body>
+</html>
         /* --- CHAT --- */
         #view-chat { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 2000; display: flex; flex-direction: column; transform: translateX(100%); transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         #view-chat.active { transform: translateX(0); }
