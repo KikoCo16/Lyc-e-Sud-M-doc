@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lycée Sud Médoc</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: https: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://meet.jit.si; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com; frame-src https://meet.jit.si;">
+    
+    <script src="https://meet.jit.si/external_api.js"></script>
+    <style>
+        :root { --blue: #0084ff; --bg: #ffffff; --gray: #f0f2f5; --text: #050505; --red: #fa3c4c; --green: #31a24c; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background: var(--bg); height: 100vh; overflow: hidden; color: var(--text); }
+        .hidden { display: none !important; }
+        button { cursor: pointer; border: none; outline: none; transition: 0.2s; }
+        
+        /* --- LOGIN --- */
+        #view-login { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 3000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; }
+        .login-logo { width: 80px; margin-bottom: 20px; }
+        .login-title { font-size: 24px; font-weight: 700; margin-bottom: 30px; background: linear-gradient(45deg, #0099ff, #a033ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .login-input { width: 100%; max-width: 300px; padding: 15px; border: 1px solid #ddd; border-radius: 12px; background: var(--gray); font-size: 16px; margin-bottom: 12px; text-align: center; }
+        .btn-primary { width: 100%; max-width: 300px; padding: 14px; background: var(--blue); color: white; border-radius: 30px; font-weight: bold; font-size: 16px; }
+
+        /* --- UI PRINCIPALE --- */
+        .header { background: white; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; height: 65px; border-bottom: 1px solid #eee; position: sticky; top: 0; }
+        .header-title { font-weight: 800; font-size: 26px; }
+        .avatar { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: #eee; flex-shrink: 0; border: 1px solid #ddd; cursor: pointer; }
+        #view-list { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+        .search-bar { padding: 10px 15px; }
+        .search-input { width: 100%; background: var(--gray); border: none; padding: 12px 18px; border-radius: 25px; font-size: 15px; outline: none;}
+        #contact-list { flex: 1; overflow-y: auto; padding-bottom: 80px; }
+        .contact-item { padding: 12px 15px; display: flex; align-items: center; gap: 12px; position: relative; cursor: pointer; border-bottom: 1px solid #fafafa; }
+        .contact-item:active, .contact-item:hover { background: #f2f2f2; }
+        .name { font-weight: 600; font-size: 16px; }
+        .last-msg { font-size: 14px; color: #65676b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* --- CHAT --- */
+        #view-chat { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 2000; display: flex; flex-direction: column; transform: translateX(100%); transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #view-chat.active { transform: translateX(0); }
+        #messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fff; }
+        .msg-row { display: flex; align-items: flex-end; gap: 8px; width: 100%; }
+        .msg-bubble { padding: 10px 14px; border-radius: 20px; font-size: 15px; max-width: 75vw; line-height: 1.4; word-wrap: break-word; }
+        .msg-row.sent { justify-content: flex-end; }
+        .msg-row.sent .msg-bubble { background: var(--blue); color: white; border-bottom-right-radius: 4px; }
+        .msg-row.received .msg-bubble { background: var(--gray); color: black; border-bottom-left-radius: 4px; }
+        .msg-bubble img, .msg-bubble video { max-width: 100%; border-radius: 12px; display: block; margin-top: 5px; }
+        .input-area { border-top: 1px solid #eee; padding: 10px; display: flex; align-items: center; gap: 10px; background: white; }
+        .input-text { flex: 1; background: var(--gray); border: none; padding: 12px 18px; border-radius: 25px; font-size: 16px; outline: none; }
+
+        /* --- TOASTS & MODALS --- */
+        #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { background: #333; color: white; padding: 12px 24px; border-radius: 30px; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: toastFadeIn 0.3s, toastFadeOut 0.3s 2.7s forwards; text-align: center; }
+        .toast.error { background: var(--red); }
+        .toast.success { background: var(--green); }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 4000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); transition: 0.2s; }
+        .modal-box { background: white; width: 85%; max-width: 350px; border-radius: 20px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        
+        /* --- FAB & MENUS --- */
+        .fab { position: fixed; bottom: 25px; right: 25px; width: 56px; height: 56px; background: var(--blue); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 30px; box-shadow: 0 5px 15px rgba(0,132,255,0.4); z-index: 100; transition: transform 0.2s; }
+        .fab:active { transform: scale(0.9); }
+        .fab-menu { position: fixed; bottom: 95px; right: 25px; display: flex; flex-direction: column; gap: 12px; opacity: 0; pointer-events: none; transition: 0.3s; transform: translateY(10px); }
+        .fab-menu.show { opacity: 1; pointer-events: all; transform: translateY(0); }
+        .fab-item { background: white; padding: 12px 20px; border-radius: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); font-weight: 600; cursor: pointer; text-align: center; transition: background 0.2s;}
+        .fab-item:hover { background: #f9f9f9; }
+        
+        .chat-menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 5000; display: flex; align-items: flex-end; }
+        .chat-menu-box { width: 100%; background: white; border-radius: 25px 25px 0 0; padding: 20px; padding-bottom: 40px;}
+        .chat-menu-item { padding: 15px; border-bottom: 1px solid #eee; font-weight: 500; cursor: pointer; }
+        .chat-menu-item:last-child { border-bottom: none; }
+
+        @keyframes toastFadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes toastFadeOut { from { opacity: 1; } to { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <div id="toast-container"></div>
+
+    <div id="view-login">
+        <img src="https://cdn-icons-png.flaticon.com/512/8093/8093162.png" class="login-logo" alt="Logo">
+        <div class="login-title">Lycée Sud Médoc</div>
+        <input type="text" id="login-username" class="login-input" placeholder="Pseudo (Inscription uniquement)">
+        <input type="number" id="login-id" class="login-input" placeholder="ID (3 à 5 chiffres)">
+        <input type="password" id="login-pw" class="login-input" placeholder="Mot de passe">
+        <button class="btn-primary" onclick="doLogin()">CONNEXION</button>
+        <div id="login-error" style="color:var(--red); font-size:14px; margin-top:15px; text-align: center; font-weight: 500;"></div>
+    </div>
+
+    <div id="view-list" class="hidden">
+        <div class="header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <label for="profile-upload" style="cursor:pointer;" title="Changer l'avatar">
+                    <img id="my-avatar" class="avatar" src="https://cdn-icons-png.flaticon.com/512/149/149071.png">
+                </label>
+                <input type="file" id="profile-upload" class="hidden" accept="image/*">
+                <div>
+                    <div class="header-title" id="header-user-name">Discussions</div>
+                    <div id="display-my-id" style="font-size: 12px; color: #888; font-weight: 600;">ID: ----</div>
+                </div>
+            </div>
+            <button onclick="requestLogout()" style="color:var(--red); background:none; font-size:12px; font-weight:bold;">QUITTER</button>
+        </div>
+        <div class="search-bar">
+            <input type="text" class="search-input" placeholder="Rechercher un contact..." oninput="filterContacts(this.value)">
+        </div>
+        <div id="contact-list"></div>
+        <div class="fab-menu" id="fab-menu">
+            <div class="fab-item" onclick="openGenericModal('group')">Nouveau Groupe 👥</div>
+            <div class="fab-item" onclick="openGenericModal('contact')">Ajouter un ID 👤</div>
+        </div>
+        <div class="fab" onclick="toggleFab()">+</div>
+    </div>
+
+    <div id="view-chat">
+        <div class="header">
+            <button onclick="closeChat()" style="color:var(--blue); background:none; font-size:28px; padding: 0 10px 0 0;">←</button>
+            <div style="display:flex; align-items:center; gap:12px; flex: 1; overflow: hidden;">
+                <img id="chat-avatar" class="avatar" style="width:38px; height:38px;">
+                <div style="display:flex; flex-direction:column; overflow: hidden;">
+                    <span id="chat-title" style="font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+                    <span id="chat-id-subtitle" style="font-size: 11px; color: #888;"></span>
+                </div>
+            </div>
+            <div style="display:flex; gap:15px; align-items: center;">
+                <button onclick="sendCallLink('audio')" style="background:none; font-size:20px;">📞</button>
+                <button onclick="sendCallLink('video')" style="background:none; font-size:20px;">🎥</button>
+                <button onclick="openChatMenu()" style="background:none; font-size:24px; color:var(--blue); font-weight:bold;">⋮</button>
+            </div>
+        </div>
+        
+        <div id="messages"></div>
+        
+        <div id="blocked-banner" class="hidden" style="padding:15px; text-align:center; background:#ffebee; color:var(--red); font-weight:bold; font-size: 14px;">
+            Vous avez bloqué cette conversation.
+        </div>
+        
+        <div class="input-area" id="input-controls">
+            <label for="media-upload" style="font-size:24px; cursor:pointer; margin-right: 5px;">🖼️</label>
+            <input type="file" id="media-upload" class="hidden" accept="image/*,video/*">
+            <input type="text" id="msgInput" class="input-text" placeholder="Écrire un message..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <button style="font-size:22px; color:var(--blue); background:none; padding:5px;" onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div id="modal-title" style="font-weight:bold; margin-bottom:15px; font-size: 18px; text-align: center;"></div>
+            <input type="text" id="modal-input" class="login-input" style="background:#f0f2f5; text-align:left; width: 100%;">
+            <input type="text" id="modal-input-2" class="login-input hidden" placeholder="Membres (ex: 123, 456)" style="background:#f0f2f5; text-align:left; width: 100%;">
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button onclick="closeModal()" style="flex:1; padding:12px; background:#eee; border-radius:12px; font-weight:bold; color:#555;">Annuler</button>
+                <button id="modal-confirm-btn" style="flex:1; padding:12px; background:var(--blue); color:white; border-radius:12px; font-weight:bold;">Valider</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm-overlay" class="modal-overlay hidden" onclick="closeConfirmModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div id="confirm-msg" style="margin-bottom:20px; font-size: 16px; text-align: center; line-height:1.4;"></div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeConfirmModal()" style="flex:1; padding:12px; background:#eee; border-radius:12px; font-weight:bold; color:#555;">Annuler</button>
+                <button id="confirm-yes-btn" style="flex:1; padding:12px; background:var(--red); color:white; border-radius:12px; font-weight:bold;">Confirmer</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-menu-overlay" class="chat-menu-overlay hidden" onclick="closeChatMenu()">
+        <div class="chat-menu-box" onclick="event.stopPropagation()">
+            <div class="chat-menu-item" onclick="openGenericModal('renameLocal')">✏️ Renommer localement</div>
+            <div id="block-menu-btn" class="chat-menu-item" onclick="handleBlockToggle()">🚫 Bloquer l'utilisateur</div>
+            <div id="admin-add-member" class="chat-menu-item hidden" onclick="openGenericModal('addMember')">👤 Ajouter des membres</div>
+            <div id="admin-rename-group" class="chat-menu-item hidden" onclick="openGenericModal('renameGroup')">✏️ Renommer le groupe</div>
+            <div class="chat-menu-item" onclick="requestDeleteChat()" style="color:var(--red);">🗑️ Masquer la discussion</div>
+        </div>
+    </div>
+
+    <div id="call-container" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:9999;">
+        <button onclick="closeCall()" style="position:absolute; top:20px; right:20px; z-index:10001; background:var(--red); color:white; padding:12px 20px; border-radius:10px; font-weight:bold; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">Raccrocher 📞</button>
+    </div>
+
+<script type="module">
+    // --- IMPORTS FIREBASE ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc, where, getDocs, writeBatch, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    // --- CONFIGURATION FIREBASE ---
+    // (Conserve ta propre clé API ici, fais attention en production)
+    const firebaseConfig = {
+        apiKey: "AIzaSyAHZTBnuW-2RStrryJVqxWJ1tpD4LLaeq8",
+        authDomain: "messenger-ed88b.firebaseapp.com",
+        projectId: "messenger-ed88b",
+        storageBucket: "messenger-ed88b.firebasestorage.app",
+        messagingSenderId: "625422257839",
+        appId: "1:625422257839:web:a85ce9402d2ae58cc9ce5a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // --- VARIABLES GLOBALES ---
+    let myId = null;
+    let currentChatId = null; 
+    let isGroupChat = false;
+    let globalMessages = [];
+    let usersCache = {};
+    let groupsCache = {};
+    let jitsiApi = null;
+    let confirmCallback = null;
+
+    // --- UTILITAIRES & SÉCURITÉ ---
+    function escapeHTML(str) {
+        if (typeof str !== 'string') return '';
+        return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+    }
+
+    window.showToast = (message, type = 'normal') => {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type === 'error' ? 'error' : type === 'success' ? 'success' : ''}`;
+        toast.innerText = message;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    };
+
+    // --- CUSTOM CONFIRM MODAL ---
+    window.askConfirm = (message, callback) => {
+        document.getElementById('confirm-msg').innerText = message;
+        document.getElementById('confirm-overlay').classList.remove('hidden');
+        confirmCallback = callback;
+    };
+    
+    window.closeConfirmModal = () => {
+        document.getElementById('confirm-overlay').classList.add('hidden');
+        confirmCallback = null;
+    };
+
+    document.getElementById('confirm-yes-btn').addEventListener('click', () => {
+        if(confirmCallback) confirmCallback();
+        window.closeConfirmModal();
+    });
+
+    // --- AUTHENTIFICATION ---
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            myId = user.email.split('@')[0];
+            document.getElementById('view-login').classList.add('hidden');
+            document.getElementById('view-list').classList.remove('hidden');
+            document.getElementById('display-my-id').innerText = "Mon ID: " + myId;
+            setupListeners();
+        } else {
+            document.getElementById('view-login').classList.remove('hidden');
+            document.getElementById('view-list').classList.add('hidden');
+        }
+    });
+
+    window.doLogin = async () => {
+        const id = document.getElementById('login-id').value.trim();
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-pw').value.trim();
+        const err = document.getElementById('login-error');
+        err.innerText = "";
+
+        if (!id || !password) return err.innerText = "ID et mot de passe requis.";
+        const fakeEmail = `${id}@lyceesudmedoc.app`;
+
+        try {
+            await signInWithEmailAndPassword(auth, fakeEmail, password);
+            window.showToast("Connexion réussie !", "success");
+        } catch (error) {
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                if (!username) return err.innerText = "Compte inconnu. Entre un Pseudo pour t'inscrire.";
+                try {
+                    await createUserWithEmailAndPassword(auth, fakeEmail, password);
+                    await setDoc(doc(db, "users", id), { 
+                        username, 
+                        avatar: "https://cdn-icons-png.flaticon.com/512/149/149071.png", 
+                        blockedUsers: [] 
+                    });
+                    window.showToast("Compte créé avec succès !", "success");
+                } catch(e) { err.innerText = "Erreur d'inscription : " + e.message; }
+            } else { err.innerText = "Erreur de connexion : " + error.message; }
+        }
+    };
+
+    window.requestLogout = () => {
+        window.askConfirm("Es-tu sûr de vouloir te déconnecter ?", () => {
+            signOut(auth).then(() => {
+                localStorage.clear();
+                window.showToast("Déconnecté", "success");
+            });
+        });
+    };
+
+    // --- LISTENERS FIREBASE ---
+    function setupListeners() {
+        // Écoute les utilisateurs
+        onSnapshot(collection(db, "users"), (snap) => {
+            snap.forEach(d => usersCache[d.id] = d.data());
+            if (usersCache[myId]) {
+                document.getElementById('my-avatar').src = usersCache[myId].avatar;
+                document.getElementById('header-user-name').innerText = usersCache[myId].username;
+            }
+            renderContactList();
+        });
+
+        // Écoute les groupes
+        onSnapshot(query(collection(db, "groups"), where("members", "array-contains", myId)), (snap) => {
+            groupsCache = {}; 
+            snap.forEach(d => groupsCache[d.id] = {id: d.id, ...d.data()});
+            renderContactList();
+        });
+
+        // Écoute les messages
+        onSnapshot(query(collection(db, "messages"), orderBy("timestamp", "desc")), (snap) => {
+            globalMessages = [];
+            snap.forEach(d => {
+                const data = d.data();
+                if (data.sender === myId || data.receiver === myId || (data.groupId && groupsCache[data.groupId])) {
+                    globalMessages.push({id: d.id, ...data});
+                }
+            });
+            renderContactList(); 
+            if (currentChatId) renderMessages();
+        });
+    }
+
+    // --- LOGIQUE LISTE DE CONTACTS ---
+    window.renderContactList = () => {
+        const list = document.getElementById('contact-list'); 
+        list.innerHTML = "";
+        
+        const nicks = JSON.parse(localStorage.getItem('tess_nicks') || '{}');
+        const hidden = JSON.parse(localStorage.getItem('tess_hide') || '[]');
+        let items = [];
+
+        // Ajout des groupes
+        for(let gId in groupsCache) {
+            if(!hidden.includes(gId)) {
+                items.push({ id: gId, name: nicks[gId] || groupsCache[gId].name, type: 'group', avatar: groupsCache[gId].avatar });
+            }
+        }
+        
+        // Extraction auto des contacts via les messages
+        let contacts = JSON.parse(localStorage.getItem('tess_contacts') || '{}');
+        globalMessages.forEach(m => { 
+            if(!m.groupId && m.sender !== myId) contacts[m.sender] = {id: m.sender, type:'user'}; 
+            if(!m.groupId && m.receiver !== myId && m.receiver) contacts[m.receiver] = {id: m.receiver, type:'user'};
+        });
+        
+        // Ajout des utilisateurs
+        for(let cId in contacts) {
+            if(!hidden.includes(cId) && cId !== myId) {
+                items.push({ id: cId, name: nicks[cId] || usersCache[cId]?.username || cId, type: 'user', avatar: usersCache[cId]?.avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png" });
+            }
+        }
+
+        items.forEach(item => {
+            const div = document.createElement('div'); 
+            div.className = "contact-item";
+            // Set un data-name pour la recherche
+            div.setAttribute('data-name', item.name.toLowerCase());
+            div.onclick = () => openChat(item);
+            
+            div.innerHTML = `
+                <img src="${item.avatar}" class="avatar">
+                <div style="flex:1; overflow:hidden;">
+                    <div class="name">${escapeHTML(item.name)}</div>
+                    <div class="last-msg">${item.type === 'group' ? 'Groupe' : 'Contact'} - ID: ${item.id}</div>
+                </div>`;
+            list.appendChild(div);
+        });
+    };
+
+    window.filterContacts = (val) => {
+        const term = val.toLowerCase().trim();
+        document.querySelectorAll('.contact-item').forEach(el => {
+            const name = el.getAttribute('data-name');
+            el.style.display = name.includes(term) ? 'flex' : 'none';
+        });
+    };
+
+    // --- LOGIQUE DU CHAT ---
+    window.openChat = (item) => {
+        currentChatId = item.id; 
+        isGroupChat = item.type === 'group';
+        document.getElementById('view-chat').classList.add('active');
+        document.getElementById('chat-title').innerText = item.name;
+        document.getElementById('chat-id-subtitle').innerText = "ID: " + item.id;
+        document.getElementById('chat-avatar').src = item.avatar;
+        
+        checkBlockStatus();
+        renderMessages();
+    };
+
+    window.closeChat = () => { 
+        document.getElementById('view-chat').classList.remove('active'); 
+        currentChatId = null; 
+    };
+
+    function checkBlockStatus() {
+        const myData = usersCache[myId];
+        const isBlocked = myData && myData.blockedUsers && myData.blockedUsers.includes(currentChatId);
+        
+        document.getElementById('blocked-banner').classList.toggle('hidden', !isBlocked || isGroupChat);
+        document.getElementById('input-controls').classList.toggle('hidden', isBlocked && !isGroupChat);
+        
+        const blockBtn = document.getElementById('block-menu-btn');
+        blockBtn.classList.toggle('hidden', isGroupChat); // On ne bloque pas un groupe, on le quitte
+        blockBtn.innerHTML = isBlocked ? "✅ Débloquer l'utilisateur" : "🚫 Bloquer l'utilisateur";
+    }
+
+    function renderMessages() {
+        const box = document.getElementById('messages'); 
+        box.innerHTML = "";
+        const localClearTime = parseInt(localStorage.getItem('clear_time_' + currentChatId) || '0');
+        
+        const msgs = globalMessages.filter(m => {
+            const belongs = isGroupChat 
+                ? m.groupId === currentChatId 
+                : (m.sender === myId && m.receiver === currentChatId) || (m.sender === currentChatId && m.receiver === myId);
+            return belongs && m.timestamp > localClearTime;
+        }).sort((a,b) => a.timestamp - b.timestamp);
+
+        msgs.forEach(m => {
+            const isMe = m.sender === myId;
+            const div = document.createElement('div');
+            div.className = `msg-row ${isMe ? 'sent' : 'received'}`;
+            
+            let content = "";
+            if (m.type === 'text') {
+                let txt = escapeHTML(m.text);
+                txt = txt.replace(/(https?:\/\/meet\.jit\.si\/[^\s]+)/g, '<button onclick="startIntegratedCall(\'$1\')" style="margin-top:5px; padding:8px 12px; border-radius:15px; border:none; background:white; color:var(--blue); font-weight:bold; cursor:pointer;">REJOINDRE L\'APPEL 📞</button>');
+                content = `<div>${txt}</div>`;
+            } else {
+                content = `<${m.type==='img'?'img':'video'} src="${escapeHTML(m.media)}" ${m.type==='video'?'controls':''}></${m.type==='img'?'img':'video'}>`;
+            }
+
+            const senderName = isGroupChat && !isMe ? `<div style="font-size:11px; color:#888; margin-bottom:2px; margin-left:4px;">${escapeHTML(usersCache[m.sender]?.username || m.sender)}</div>` : "";
+            div.innerHTML = `<div style="max-width:85%;">${senderName}<div class="msg-bubble">${content}</div></div>`;
+            box.appendChild(div);
+        });
+        
+        setTimeout(() => box.scrollTop = box.scrollHeight, 50); // Auto-scroll
+    }
+
+    window.sendMessage = async () => {
+        const inp = document.getElementById('msgInput');
+        const text = inp.value.trim();
+        if(!text || !currentChatId) return; 
+        
+        inp.value = "";
+
+        // GESTION DES COMMANDES LOCALES
+        if (text === '/clear') { 
+            localStorage.setItem('clear_time_' + currentChatId, Date.now()); 
+            window.showToast("Historique local effacé");
+            return renderMessages(); 
+        }
+        
+        if (text.startsWith('/supr ')) {
+            const nb = parseInt(text.split(' ')[1]);
+            if(isNaN(nb)) return window.showToast("Commande invalide. Ex: /supr 5", "error");
+            
+            try {
+                // Simplification de la query pour éviter les erreurs d'index Firestore manquant
+                const q = query(collection(db, "messages"), where("sender", "==", myId));
+                const snap = await getDocs(q);
+                let myMsgs = [];
+                snap.forEach(d => myMsgs.push({id: d.id, ...d.data()}));
+                
+                myMsgs.sort((a,b) => b.timestamp - a.timestamp); // Sort client-side
+                const toDelete = myMsgs.slice(0, nb);
+                
+                const batch = writeBatch(db);
+                toDelete.forEach(msg => batch.delete(doc(db, "messages", msg.id)));
+                await batch.commit();
+                window.showToast(`${toDelete.length} messages supprimés`);
+            } catch(e) { window.showToast("Erreur suppression: " + e.message, "error"); }
+            return;
+        }
+
+        // ENVOI MESSAGE NORMAL
+        const data = { sender: myId, text, timestamp: Date.now(), type: 'text' };
+        if(isGroupChat) data.groupId = currentChatId; else data.receiver = currentChatId;
+        
+        try {
+            await addDoc(collection(db, "messages"), data);
+        } catch(e) {
+            window.showToast("Erreur d'envoi", "error");
+        }
+    };
+
+    // --- UPLOAD FICHIERS (Avatar & Médias) ---
+    document.getElementById('profile-upload').addEventListener('change', async e => {
+        const file = e.target.files[0]; if(!file) return;
+        const reader = new FileReader();
+        reader.onload = async evt => {
+            try {
+                await updateDoc(doc(db, "users", myId), { avatar: evt.target.result });
+                window.showToast("Avatar mis à jour", "success");
+            } catch(err) { window.showToast("Erreur mise à jour avatar", "error"); }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    document.getElementById('media-upload').addEventListener('change', async e => {
+        const file = e.target.files[0]; if(!file) return;
+        if(file.size > 2000000) return window.showToast("Fichier trop lourd (Max 2Mo pour le test)", "error"); // Limite Firebase base64
+
+        window.showToast("Envoi du fichier en cours...");
+        const reader = new FileReader();
+        reader.onload = async evt => {
+            const type = file.type.startsWith('image') ? 'img' : 'video';
+            const data = { sender: myId, media: evt.target.result, type, timestamp: Date.now() };
+            if(isGroupChat) data.groupId = currentChatId; else data.receiver = currentChatId;
+            try {
+                await addDoc(collection(db, "messages"), data);
+            } catch(err) { window.showToast("Erreur d'envoi fichier", "error"); }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // --- APPELS VIDÉO (JITSI) ---
+    window.sendCallLink = async (type) => {
+        if(!currentChatId) return;
+        const room = `SM_${myId}_${Math.floor(Math.random()*10000)}`;
+        const link = `https://meet.jit.si/${room}`;
+        startIntegratedCall(link);
+        
+        const data = { sender: myId, text: `Appel ${type} commencé : ${link}`, timestamp: Date.now(), type: 'text' };
+        if(isGroupChat) data.groupId = currentChatId; else data.receiver = currentChatId;
+        await addDoc(collection(db, "messages"), data);
+    };
+
+    window.startIntegratedCall = (link) => {
+        const room = link.split('/').pop();
+        document.getElementById('call-container').classList.remove('hidden');
+        if(jitsiApi) jitsiApi.dispose(); // Clean if exists
+        
+        const options = {
+            roomName: room,
+            parentNode: document.getElementById('call-container'),
+            width: '100%',
+            height: '100%',
+            interfaceConfigOverwrite: { TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup', 'chat', 'tileview'] }
+        };
+        jitsiApi = new JitsiMeetExternalAPI("meet.jit.si", options);
+    };
+
+    window.closeCall = () => { 
+        if(jitsiApi) jitsiApi.dispose(); 
+        document.getElementById('call-container').classList.add('hidden'); 
+    };
+
+    // --- MENUS & FAB ---
+    window.toggleFab = () => document.getElementById('fab-menu').classList.toggle('show');
+    
+    // --- GESTION DES MODALES GÉNÉRIQUES ---
+    let currentModalAction = null;
+
+    window.openGenericModal = (type) => {
+        const overlay = document.getElementById('modal-overlay');
+        const titleEl = document.getElementById('modal-title');
+        const input1 = document.getElementById('modal-input');
+        const input2 = document.getElementById('modal-input-2');
+        
+        overlay.classList.remove('hidden');
+        input1.value = ""; input2.value = "";
+        input2.classList.add('hidden');
+        currentModalAction = type;
+
+        if (type === 'group') {
+            titleEl.innerText = "Créer un groupe";
+            input1.placeholder = "Nom du groupe";
+            input2.classList.remove('hidden');
+            input2.placeholder = "ID des membres (séparés par des virgules)";
+        } else if (type === 'contact') {
+            titleEl.innerText = "Ajouter un contact";
+            input1.placeholder = "ID du contact";
+            input1.type = "number";
+        } else if (type === 'renameLocal') {
+            titleEl.innerText = "Renommer pour moi";
+            input1.placeholder = "Nouveau pseudo";
+        } else if (type === 'renameGroup') {
+            titleEl.innerText = "Renommer le groupe";
+            input1.placeholder = "Nouveau nom du groupe";
+        } else if (type === 'addMember') {
+            titleEl.innerText = "Ajouter au groupe";
+            input1.placeholder = "ID du/des membre(s) à ajouter";
+        }
+        
+        window.closeChatMenu(); // Ferme le menu contextuel si ouvert
+        window.toggleFab(); // Tente de fermer le FAB s'il est ouvert (toggle simple)
+        document.getElementById('fab-menu').classList.remove('show');
+    };
+
+    window.closeModal = () => document.getElementById('modal-overlay').classList.add('hidden');
+
+    document.getElementById('modal-confirm-btn').addEventListener('click', async () => {
+        const val = document.getElementById('modal-input').value.trim();
+        const val2 = document.getElementById('modal-input-2').value.trim();
+        
+        if(!val) return window.showToast("Champ vide", "error");
+
+        try {
+            if(currentModalAction === 'contact') {
+                let c = JSON.parse(localStorage.getItem('tess_contacts') || '{}');
+                c[val] = {id: val, type: 'user'};
+                localStorage.setItem('tess_contacts', JSON.stringify(c));
+                window.showToast("Contact ajouté localement", "success");
+            } 
+            else if(currentModalAction === 'group') {
+                const mems = [myId, ...val2.split(',').map(x => x.trim()).filter(x => x)];
+                await addDoc(collection(db, "groups"), { name: val, members: mems, createdBy: myId, avatar: "https://cdn-icons-png.flaticon.com/512/166/166258.png" });
+                window.showToast("Groupe créé", "success");
+            }
+            else if (currentModalAction === 'renameLocal') {
+                let nicks = JSON.parse(localStorage.getItem('tess_nicks') || '{}');
+                nicks[currentChatId] = val;
+                localStorage.setItem('tess_nicks', JSON.stringify(nicks));
+                document.getElementById('chat-title').innerText = val;
+                window.showToast("Renommé localement");
+            }
+            else if (currentModalAction === 'renameGroup' && isGroupChat) {
+                await updateDoc(doc(db, "groups", currentChatId), { name: val });
+                window.showToast("Groupe renommé pour tous");
+            }
+            else if (currentModalAction === 'addMember' && isGroupChat) {
+                const newMems = val.split(',').map(x => x.trim()).filter(x => x);
+                const grp = groupsCache[currentChatId];
+                if(grp) {
+                    const merged = [...new Set([...grp.members, ...newMems])];
+                    await updateDoc(doc(db, "groups", currentChatId), { members: merged });
+                    window.showToast("Membres ajoutés");
+                }
+            }
+        } catch(e) { window.showToast("Erreur: " + e.message, "error"); }
+        
+        closeModal(); 
+        renderContactList();
+    });
+    
+    // --- ACTIONS CHAT (Bloquer / Masquer) ---
+    window.openChatMenu = () => {
+        document.getElementById('chat-menu-overlay').classList.remove('hidden');
+        const isAdmin = isGroupChat && groupsCache[currentChatId]?.createdBy === myId;
+        
+        document.getElementById('admin-add-member').classList.toggle('hidden', !isAdmin);
+        document.getElementById('admin-rename-group').classList.toggle('hidden', !isAdmin);
+    };
+    
+    window.closeChatMenu = () => document.getElementById('chat-menu-overlay').classList.add('hidden');
+
+    window.handleBlockToggle = async () => {
+        if(isGroupChat) return window.showToast("Impossible de bloquer un groupe.", "error");
+        window.closeChatMenu();
+
+        try {
+            const userRef = doc(db, "users", myId);
+            const userSnap = await getDoc(userRef);
+            let blocked = userSnap.data()?.blockedUsers || [];
+
+            if (blocked.includes(currentChatId)) {
+                blocked = blocked.filter(id => id !== currentChatId);
+                window.showToast("Utilisateur débloqué", "success");
+            } else {
+                blocked.push(currentChatId);
+                window.showToast("Utilisateur bloqué", "error");
+            }
+
+            await updateDoc(userRef, { blockedUsers: blocked });
+            usersCache[myId].blockedUsers = blocked; // Met à jour le cache direct
+            checkBlockStatus();
+        } catch(e) { window.showToast("Erreur lors du blocage", "error"); }
+    };
+
+    window.requestDeleteChat = () => {
+        window.closeChatMenu();
+        window.askConfirm("Es-tu sûr de vouloir masquer cette discussion ?", () => {
+            let h = JSON.parse(localStorage.getItem('tess_hide') || '[]');
+            if(!h.includes(currentChatId)) h.push(currentChatId);
+            localStorage.setItem('tess_hide', JSON.stringify(h));
+            window.showToast("Discussion masquée");
+            closeChat(); 
+            renderContactList();
+        });
+    };
+
+</script>
+</body>
+</html>
